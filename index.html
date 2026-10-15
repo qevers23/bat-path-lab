@@ -1,0 +1,2322 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+
+<title>Bat Path Lab</title>
+<style>
+
+
+/* Dark canvas, one cool accent, zero shadows, closed palette. Deliberately
+   single-theme: a 3D scene reads its depth cues far better on black. Every color
+   is painted explicitly so the page holds on either host ground. */
+:root{
+  --black:#000000; --panel:#111111; --raised:#1A1A1A; --mineshaft:#262626;
+  --accent:#7CC4F2; --accent2:#3E8FC9;
+  --white:#FFFFFF; --athens:#F4F4F5; --muted:#9CA3AF; --footnote:#6B7280;
+  --green:#10B981; --red:#EF4444; --dist:#D1D5DB;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--black); color:var(--athens);
+  font-family:var(--font); font-weight:500; line-height:1.72;
+  font-size:16px; letter-spacing:.005em; overflow-x:hidden;
+}
+h1,h2{font-family:var(--font);text-transform:uppercase;font-weight:900;letter-spacing:.01em}
+h3,h4,.eyebrow,.btn,th{font-family:var(--font);font-weight:500;letter-spacing:.01em}
+/* The page title sits at the same size as the section headings, so the hero reads
+   as the first section rather than a separate cover. */
+h1{font-size:clamp(1.3rem,2.2vw,1.72rem);line-height:1.12;margin:0;text-wrap:balance;
+  font-weight:500;letter-spacing:.03em}
+h2{font-size:clamp(1.3rem,2.2vw,1.72rem);line-height:1.12;margin:0;text-wrap:balance;
+  font-weight:500;letter-spacing:.03em}
+h3{font-size:1.06rem;margin:0;letter-spacing:0;font-weight:900}
+h4{font-size:.92rem;margin:0;font-weight:500;letter-spacing:0;color:var(--muted)}
+p{margin:0}
+a{color:var(--accent)}
+.eyebrow{font-size:.8rem;font-weight:500;letter-spacing:.02em;color:var(--accent)}
+.mono{font-variant-numeric:tabular-nums}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1720px;margin:0 auto;padding:0 24px}
+/* The handedness toggle lives in the Swing panel now; there is no rail. */
+.handrow{margin-bottom:14px}
+.handrow .seg{width:136px}
+.seg{display:flex;gap:0;border-radius:8px;overflow:hidden;background:var(--mineshaft)}
+.seg button{
+  flex:1;background:none;border:none;color:var(--muted);cursor:pointer;
+  font-family:var(--font);font-weight:500;font-size:.7rem;letter-spacing:.06em;
+  padding:8px 4px;
+}
+.seg button:hover{color:var(--white)}
+.seg button.on{background:var(--accent);color:var(--black);font-weight:900}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.handnote{font-size:.75rem;color:var(--muted);margin-top:9px;line-height:1.55}
+.shell{margin-left:0}
+@media(max-width:1000px){
+  .seg button{padding:6px 10px}
+}
+
+/* ---------- hero ---------- */
+/* Title band runs the full page width; the scene sits below it, beside the lede. */
+.hero{padding:26px 0 18px}
+.herohead{display:flex;flex-direction:column;gap:14px;margin-bottom:40px}
+.herobody{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:start}
+.herobody > *{min-width:0}
+@media(max-width:900px){
+  .hero{padding-top:36px}
+  .herohead{margin-bottom:28px}
+  .herobody{grid-template-columns:1fr;gap:28px}
+}
+.hero .lede{font-size:1.05rem;color:var(--muted);max-width:62ch}
+.provenance{
+  border-top:2px solid var(--accent);padding:15px 0 0;
+  font-size:.83rem;color:var(--muted);line-height:1.55;
+}
+.provenance b{color:var(--athens);font-weight:700}
+
+/* ---------- section ---------- */
+section{padding:56px 0;border-top:1px solid var(--mineshaft)}
+.sechead{margin-bottom:8px;max-width:76ch}
+.tagline{color:var(--muted);max-width:66ch;margin-top:10px}
+
+/* Alternate which side the scene sits on. Four identical two-column sections
+   in a row reads as a template; the flip gives the page a rhythm. */
+.stagegrid.flip{grid-template-columns:1fr 1.35fr}
+.stagegrid.flip > :first-child{order:2}
+@media(max-width:980px){.stagegrid.flip{grid-template-columns:1fr}}
+
+/* ---------- stage ---------- */
+.stagegrid{display:grid;grid-template-columns:1.35fr 1fr;gap:26px;margin-top:26px;align-items:start}
+/* Grid children default to min-width:auto, which lets wide content (the
+   scatter min-width) push the whole page sideways instead of scrolling
+   inside its own .scroller. min-width:0 restores the containment. */
+.stagegrid > *{min-width:0}
+@media(max-width:980px){.stagegrid{grid-template-columns:1fr}}
+.stagebox{background:var(--panel);padding:14px}
+.canvaswrap{position:relative;width:100%;aspect-ratio:4/3;background:var(--black)}
+@media(max-width:560px){.canvaswrap{aspect-ratio:1/1}}
+canvas.scene{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+canvas.scene:active{cursor:grabbing}
+.hint{
+  position:absolute;left:12px;bottom:10px;font-size:.76rem;color:var(--muted);
+  font-family:var(--font);font-weight:500;letter-spacing:0;
+  pointer-events:none;
+}
+.recon{
+  position:absolute;right:12px;top:10px;font-size:.74rem;color:var(--muted);
+  font-family:var(--font);font-weight:500;letter-spacing:0;
+  pointer-events:none;text-align:right;line-height:1.5;max-width:46%;
+}
+.cams{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.btn{
+  background:var(--mineshaft);color:var(--athens);border:none;border-radius:8px;
+  padding:7px 13px;font-size:.68rem;letter-spacing:.08em;cursor:pointer;font-weight:500;
+}
+.btn:hover{background:var(--accent2);color:var(--black)}
+.btn.on{background:var(--accent);color:var(--black);font-weight:900}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.transport{display:flex;gap:10px;align-items:center;margin-top:12px}
+.transport .seg{flex:none}
+.transport .seg button{padding:7px 10px;font-size:.66rem}
+.transport input[type=range]{flex:1}
+
+/* range inputs */
+input[type=range]{
+  -webkit-appearance:none;appearance:none;height:4px;background:var(--mineshaft);
+  border-radius:8px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;border-radius:8px;
+  background:var(--accent);cursor:pointer;border:none;
+}
+input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border-radius:8px;background:var(--accent);cursor:pointer;border:none;
+}
+input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--white);outline-offset:2px}
+
+/* ---------- explainer tiers ---------- */
+.metricdef{background:var(--panel);padding:16px 18px;margin-top:16px}
+.metricdef .name{
+  font-family:var(--font);font-weight:900;font-size:.95rem;color:var(--accent);
+  letter-spacing:0;
+}
+.metricdef p{font-size:.93rem;color:var(--athens);margin-top:7px}
+details.deeper{margin-top:14px;background:var(--panel);padding:0 18px}
+details.deeper summary{
+  cursor:pointer;padding:13px 0;font-family:var(--font);font-weight:500;font-size:.82rem;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--accent);list-style:none;
+}
+details.deeper summary::-webkit-details-marker{display:none}
+details.deeper summary::before{content:"+ ";font-weight:900}
+details.deeper[open] summary::before{content:"- "}
+details.deeper summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+details.deeper .body{padding:0 0 16px;font-size:.9rem;color:var(--muted);line-height:1.68}
+details.deeper .body p+p{margin-top:11px}
+details.deeper .body b{color:var(--athens);font-weight:700}
+
+/* ---------- controls / readout ---------- */
+.controls{background:var(--panel);padding:16px 18px;margin-top:16px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;margin-bottom:13px}
+.ctl:last-child{margin-bottom:0}
+.ctl label{font-family:var(--font);font-weight:500;font-size:.8rem;
+  letter-spacing:0;color:var(--muted)}
+.ctl .val{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:700;font-size:.9rem}
+.ctl input[type=range]{grid-column:1/-1;width:100%}
+.ctl label.link{grid-column:1/-1;display:flex;gap:6px;align-items:center;font-size:.72rem;color:var(--muted);cursor:pointer}
+.readout{display:flex;gap:0;flex-wrap:wrap;margin-top:14px;background:var(--panel)}
+.stat{flex:1 1 90px;padding:13px 14px;border-right:1px solid var(--black)}
+.stat:last-child{border-right:none}
+.stat .k{font-family:var(--font);font-weight:500;font-size:.75rem;letter-spacing:0;
+  color:var(--muted)}
+.stat .v{font-size:1.32rem;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--white);line-height:1.25}
+.stat .v.hi{color:var(--accent)}
+.stat .u{font-size:.7rem;color:var(--muted);font-weight:400}
+
+select{
+  background:var(--mineshaft);color:var(--athens);border:none;border-radius:8px;
+  padding:8px 11px;font-family:var(--font);font-size:.88rem;width:100%;cursor:pointer;
+}
+select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- charts ---------- */
+.chartbox{background:var(--panel);padding:18px}
+.chartbox svg{display:block;width:100%;height:auto;overflow:visible}
+.scroller{overflow-x:auto}
+/* Let the scatter scroll rather than shrink its axis labels to nothing
+   on a phone. The .scroller parent supplies the horizontal scroll. */
+#scatter{min-width:520px}
+.legend{display:flex;gap:15px;flex-wrap:wrap;margin-top:12px;font-size:.75rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:middle}
+
+/* ---------- leader table ---------- */
+.ltable{width:100%;border-collapse:collapse;font-size:.9rem}
+.ltable th{
+  font-size:.78rem;letter-spacing:0;color:var(--muted);text-align:right;
+  padding:0 0 8px;border-bottom:1px solid var(--mineshaft);font-weight:500;
+}
+.ltable th:first-child{text-align:left}
+.ltable td{padding:9px 0;border-bottom:1px solid var(--mineshaft);text-align:right}
+.ltable td:first-child{text-align:left;color:var(--athens)}
+.ltable tr:last-child td{border-bottom:none}
+.ltable .num{font-variant-numeric:tabular-nums;color:var(--athens)}
+.ltable .lead{color:var(--accent);font-weight:700}
+
+footer{padding:44px 0 64px;border-top:1px solid var(--mineshaft);color:var(--muted);font-size:.8rem}
+footer b{color:var(--muted);font-weight:700}
+footer p+p{margin-top:9px}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- lab layout ----------
+   Desktop: the field fills the window and everything else floats over it.
+   Phone: overlays would bury the field, so the field pins to the top and the
+   controls scroll beneath it. */
+.app{position:fixed;inset:0;overflow:hidden;background:var(--black)}
+.view{position:absolute;inset:0}
+.stage{position:absolute;inset:0}
+.stage canvas.scene{position:absolute;inset:0;width:100%;height:100%}
+.topbar{position:absolute;top:12px;left:16px;right:16px;display:flex;align-items:center;gap:14px;z-index:3}
+.topbar h1{font-size:1.15rem;white-space:nowrap;margin-right:6px}
+.topbar .cams{margin-top:0}
+.topright{margin-left:auto;display:flex;gap:6px}
+.panel{position:absolute;top:60px;z-index:3;overflow:auto;padding:12px 14px;
+  background:rgba(10,10,10,.88);
+  border:1px solid var(--mineshaft);border-radius:10px;scrollbar-width:thin}
+.panel.left{left:16px;width:300px;max-height:calc(100% - 76px)}
+.panel.right{right:16px;width:272px;max-height:calc(100% - 76px)}
+.panel .sec+.sec,.panel .sec+.btn{margin-top:14px;padding-top:12px;border-top:1px solid var(--mineshaft)}
+.panel .ctl{margin-bottom:9px;gap:2px 10px}
+.panel .ctl label{font-size:.76rem;line-height:1.25}
+.panel .ctl .val{font-size:.86rem}
+.panel .panelhead{font-size:.68rem;margin-bottom:8px}
+.panel .pct{margin-bottom:6px;font-size:.75rem;grid-template-columns:1fr 60px 40px}
+.panel .btn.ghost{padding:9px 10px;font-size:.66rem;margin-top:12px}
+.bottom{position:absolute;left:332px;right:304px;bottom:14px;z-index:3;padding:10px 12px;
+  background:rgba(10,10,10,.88);
+  border:1px solid var(--mineshaft);border-radius:10px}
+.bottom .transport{margin-top:0}
+.bottom .readout{margin-top:8px;background:none}
+.bottom .stat{flex:1 1 0;min-width:0;padding:6px 10px;border-right:1px solid var(--mineshaft)}
+.bottom .readout{flex-wrap:nowrap}
+.bottom .stat .k{font-size:.7rem;line-height:1.3}
+.bottom .stat .v{font-size:1.12rem}
+.hint{left:auto;right:320px;bottom:auto;top:62px}
+.legend3d{position:absolute;left:332px;top:62px;display:flex;gap:14px;font-size:.72rem;color:var(--muted);pointer-events:none}
+.legend3d i{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;border-radius:2px}
+.legend3d .lp{background:var(--white)} .legend3d .lf{background:var(--green)} .legend3d .lb{background:var(--accent2)}
+/* Narrow desktops: eight tiles in one row get crushed, so two rows of four. */
+@media(min-width:1000px) and (max-width:1399px){
+  .bottom .readout{flex-wrap:wrap}
+  .bottom .stat{flex:1 1 22%;border-right:none}
+}
+/* Text that floats on the field keeps a shadow, so the light towers never wash it out. */
+.topbar h1,.legend3d,.hint{text-shadow:0 1px 3px #000,0 0 8px #000}
+.app.bare .panel{display:none}
+.app.bare .bottom{left:16px;right:16px}
+.app.bare .legend3d{left:16px}
+.app.bare .hint{right:16px}
+.about{position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px}
+.about[hidden]{display:none}
+.aboutbox{position:relative;max-width:720px;max-height:86vh;overflow:auto;padding:22px 24px;
+  background:var(--panel);border:1px solid var(--mineshaft);border-radius:10px}
+.aboutbox #ceiling{font-size:.92rem;color:var(--athens);line-height:1.6;margin:0 0 12px;padding-right:70px}
+.aboutbox .body{font-size:.88rem;color:var(--muted);line-height:1.62}
+.aboutbox .body p+p{margin-top:10px}
+.aboutbox .body b{color:var(--athens);font-weight:700}
+.closeabout{position:absolute;top:16px;right:16px}
+
+.panelhead{font-size:.7rem;margin-bottom:9px}
+.slidercol .ctl{margin-bottom:9px;gap:2px 10px}
+.slidercol .ctl label{font-size:.78rem;line-height:1.25}
+.slidercol .ctl .val{font-size:.88rem}
+.slidercol input[type=range]{height:4px}
+
+.slidercol .pct{margin-bottom:7px;font-size:.76rem;grid-template-columns:1fr 46px 34px}
+.slidercol .btn.ghost{padding:9px 12px;font-size:.7rem}
+.viewcol .stagebox{padding:11px}
+.viewcol .readout{margin-top:10px}
+.viewcol .stat{padding:12px 14px}
+@media(min-width:1001px){.viewcol .stat{flex-basis:22%}}   /* 8 tiles: two rows of four */
+.viewcol .stat .v{font-size:1.3rem}
+.viewcol .stat .k{font-size:.74rem}
+.panelhead{font-family:var(--font);font-weight:900;font-size:.72rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.pct{display:grid;grid-template-columns:1fr 90px 54px;gap:10px;align-items:center;
+  margin-bottom:9px;font-size:.78rem;color:var(--muted)}
+.pct .pbar{background:var(--mineshaft);height:6px;border-radius:6px;overflow:hidden}
+.pct .pbar i{display:block;height:100%;background:var(--accent)}
+.pct .pv{text-align:right;color:var(--athens);font-variant-numeric:tabular-nums;font-weight:700}
+.pct .pv em{font-style:normal;font-size:.66rem;color:var(--footnote)}
+.btn.ghost{background:none;border:1px solid var(--mineshaft);color:var(--muted);width:100%}
+.btn.ghost:hover{background:var(--mineshaft);color:var(--white)}
+#ballview{display:block;width:100%;height:auto}
+#ballview text{font-family:var(--font);font-size:10px;letter-spacing:.04em}
+.ballnote{font-size:.74rem;line-height:1.45;color:var(--muted);margin-top:6px}
+.ballnote b{color:var(--athens);font-variant-numeric:tabular-nums}
+.ballnote .row{display:flex;justify-content:space-between;gap:8px}
+
+/* ---------- phone ----------
+   Overlays would bury the field, so the field and the four results that matter
+   pin to the top and the controls scroll beneath. Batter side, tilt and the
+   pitch fold under "More settings", and path and face move to the top of the list. */
+.phone,.ls,.ends{display:none}
+.presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.presets .btn{padding:8px 6px;font-size:.66rem}
+.panel .sec.phone+.sec{margin-top:0;padding-top:0;border-top:0}
+@media(max-width:999px){
+  body{overflow-y:auto}
+  .app{position:static;overflow:visible}
+  .view{position:sticky;top:0;z-index:4;background:var(--black)}
+  .stage{position:relative;height:44vh;height:44svh;min-height:190px;max-height:520px}
+  .topbar{top:8px;left:10px;right:10px;flex-wrap:wrap;gap:6px}
+  .topbar h1{font-size:.95rem}
+  .topbar .cams,#spd-lab{display:none}
+  .topright .btn{min-height:32px;font-size:.62rem}
+  #cam-cycle{display:inline-block}
+  .topright .btn{padding:0 12px}
+  #panels-btn,.hint,.legend3d{display:none}
+  .bottom{position:static;border-radius:0;border-width:1px 0;padding:6px 10px 8px}
+  .bottom .transport{gap:8px}
+  .bottom .transport input[type=range]{min-width:0}
+  .bottom .transport .btn,.bottom .transport .seg button{min-height:34px}
+  .bottom .readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:6px}
+  #ro-lab .stat:nth-child(n+5){display:none}
+  .bottom .stat{padding:3px 6px;min-height:50px}
+  .bottom .stat:nth-child(4){border-right:none}
+  .stat .k{font-size:.64rem;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bottom .stat .v{font-size:1.02rem;line-height:1.2}
+  .bottom .stat:nth-child(4) .v{font-size:.86rem;line-height:1.15}
+  .stat .u{display:block;font-size:.6rem;line-height:1.1}
+  .lx{display:none}
+  .ls{display:inline}
+  .phone{display:block}
+  .ends{display:flex;justify-content:space-between;grid-column:1/-1;margin-top:-4px;
+    font-size:.62rem;line-height:1.2;color:var(--footnote);letter-spacing:.03em}
+  .panel{position:static;width:auto!important;max-height:none;margin:8px 10px;border-radius:10px;padding:12px}
+  .panel.left:not(.more) .adv{display:none}
+  .panel .ctl{margin-bottom:4px}
+  .panel.left .sec{display:flex;flex-direction:column}
+  .panel.left .panelhead{display:none}
+  .panel.left .sec+.sec,.panel .sec.phone+.sec{margin-top:8px;padding-top:0;border-top:0}
+  .app:not(.details) .panel.right{display:none}
+  .panel.left .ctl.lead,.panel.left .handrow{order:-1}
+  .panel .ctl label{font-size:.82rem}
+  input[type=range]{height:28px;background:linear-gradient(var(--mineshaft),var(--mineshaft)) center/100% 5px no-repeat}
+  input[type=range]::-webkit-slider-thumb{width:24px;height:24px;border-radius:12px}
+  input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:12px}
+  .presets{gap:5px}
+  .presets .btn{min-height:34px;padding:0 2px;font-size:.6rem;letter-spacing:.02em}
+  .panel .btn.ghost{min-height:40px}
+  #ro-more{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0;background:none}
+  #ro-more .stat{border-right:none;border-bottom:1px solid var(--mineshaft);padding:6px 4px}
+  .about{position:fixed;padding:10px}
+  .aboutbox{max-height:calc(100vh - 20px);max-height:calc(100svh - 20px);padding:16px}
+}
+/* A phone on its side: field on the left, controls on the right, both in view. */
+@media(max-width:999px) and (orientation:landscape) and (max-height:540px){
+  .view{position:fixed;left:0;top:0;bottom:0;width:56%;display:flex;flex-direction:column}
+  .stage{flex:1;height:auto;min-height:0;max-height:none}
+  .panel{margin-left:calc(56% + 10px)}
+}
+</style>
+<div class="app" id="lab">
+  <div class="view">
+    <div class="stage">
+      <canvas class="scene" id="c-lab"></canvas>
+      <div class="hint">Drag to orbit &middot; scroll to zoom</div>
+      <div class="legend3d"><span><i class="lp"></i>Path (HAA)</span><span><i class="lf"></i>Face (HBA)</span><span><i class="lb"></i>Ball</span></div>
+    </div>
+    <div class="topbar">
+      <h1>Bat Path Lab</h1>
+      <div class="cams" id="cam-lab"></div>
+      <div class="topright">
+        <button class="btn" id="panels-btn" type="button">Hide panels</button>
+        <button class="btn phone" id="cam-cycle" type="button">View: 3/4</button>
+        <button class="btn" id="about-btn" type="button">About</button>
+      </div>
+    </div>
+    <div class="bottom">
+      <div class="transport">
+        <button class="btn" id="play-lab" type="button">Play</button>
+        <div class="seg" id="spd-lab" role="group" aria-label="Playback speed">
+          <button type="button" data-mult="1">1&times;</button>
+          <button type="button" data-mult="0.5" class="on">&frac12;&times;</button>
+          <button type="button" data-mult="0.25">&frac14;&times;</button>
+        </div>
+        <input type="range" id="t-lab" min="0" max="1000" value="300" aria-label="Scrub the swing">
+      </div>
+      <div class="readout" id="ro-lab"></div>
+    </div>
+  </div>
+
+  <aside class="panel left">
+    <div class="sec">
+        <div class="panelhead">Try a swing</div>
+        <div class="presets" id="presets">
+          <button class="btn" type="button" data-p='{"bs":76,"aa":16,"dir":-4,"face":-15,"off":0.25}'>Pull air</button>
+          <button class="btn" type="button" data-p='{"aa":6,"dir":10,"face":4}'>Oppo liner</button>
+          <button class="btn" type="button" data-p='{"aa":5,"dir":-4,"face":-16,"off":-0.5}'>Rollover</button>
+        </div>
+    </div>
+    <div class="sec">
+        <div class="panelhead">Swing</div>
+        <div class="ctl handrow adv">
+          <label>Batter</label>
+          <div class="seg" id="handseg" role="group" aria-label="Batter handedness">
+            <button type="button" data-hand="R" class="on">RHH</button>
+            <button type="button" data-hand="L">LHH</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label for="s-bs">Bat speed</label><span class="val" id="v-bs">71.4</span>
+          <input type="range" id="s-bs" min="55" max="85" step="0.1" value="71.4">
+        </div>
+        <div class="ctl">
+          <label for="s-aa">Attack angle</label><span class="val" id="v-aa">8.5</span>
+          <input type="range" id="s-aa" min="-10" max="30" step="0.5" value="8.5">
+        </div>
+        <div class="ctl adv">
+          <label for="s-tilt">Swing tilt</label><span class="val" id="v-tilt">32</span>
+          <input type="range" id="s-tilt" min="10" max="55" step="1" value="32">
+        </div>
+        <div class="ctl lead">
+          <label for="s-dir"><span class="lx">Horizontal attack angle: where the path moves (negative&nbsp;=&nbsp;pull)</span><span class="ls">Path direction (HAA)</span></label><span class="val" id="v-dir">0.0</span>
+          <input type="range" id="s-dir" min="-30" max="30" step="0.5" value="0.0">
+          <div class="ends"><span>&larr; PULL</span><span>OPPO &rarr;</span></div>
+        </div>
+        <div class="ctl lead">
+          <label for="s-face"><span class="lx">Horizontal bat angle: where the barrel faces (negative&nbsp;=&nbsp;pull)</span><span class="ls">Face direction (HBA)</span></label><span class="val" id="v-face">-10</span>
+          <input type="range" id="s-face" min="-40" max="30" step="1" value="-10">
+          <div class="ends"><span>&larr; PULL</span><span>OPPO &rarr;</span></div>
+          <label class="link adv"><input type="checkbox" id="s-link"> Face turns with path (1.2&deg; per 1&deg;, as in real swings)</label>
+        </div>
+    </div>
+    <div class="sec">
+        <div class="panelhead">Contact</div>
+        <div class="ctl">
+          <label for="s-off"><span class="lx">Barrel offset from squared up, + is under the ball</span><span class="ls">Barrel offset from squared up</span></label><span class="val" id="v-off">0.00</span>
+          <input type="range" id="s-off" min="-1" max="1" step="0.05" value="0">
+          <div class="ends"><span>&larr; OVER THE BALL</span><span>UNDER THE BALL &rarr;</span></div>
+        </div>
+        <button class="btn ghost phone" id="more-btn" type="button" aria-expanded="false">More settings: batter, tilt, pitch, face link</button>
+    </div>
+    <div class="sec adv">
+        <div class="panelhead">Pitch</div>
+        <div class="ctl">
+          <label for="s-pv">Pitch velocity (release)</label><span class="val" id="v-pv">93</span>
+          <input type="range" id="s-pv" min="65" max="103" step="1" value="93">
+        </div>
+        <div class="ctl">
+          <label for="s-pvaa">Pitch descent angle</label><span class="val" id="v-pvaa">-6.0</span>
+          <input type="range" id="s-pvaa" min="-11" max="-3" step="0.1" value="-6.0">
+        </div>
+    </div>
+    <button class="btn ghost" id="reset" type="button">Reset to a league-average swing, met dead center</button>
+    <button class="btn ghost phone" id="details-btn" type="button" aria-expanded="false">Details: contact, MLB percentiles, more results</button>
+  </aside>
+
+  <aside class="panel right">
+    <div class="sec phone">
+        <div class="panelhead">More Results</div>
+        <div class="readout" id="ro-more"></div>
+    </div>
+    <div class="sec">
+        <div class="panelhead">Barrel on Ball at Contact</div>
+        <svg id="ballview" viewBox="0 0 240 176" role="img"
+             aria-label="Side view of the barrel and ball at contact, showing the barrel offset"></svg>
+        <div id="ballnote" class="ballnote"></div>
+    </div>
+    <div class="sec">
+        <div class="panelhead">Where These Settings Sit, 2025 MLB</div>
+        <div id="pcts"></div>
+    </div>
+  </aside>
+
+  <div class="about" id="about" hidden>
+    <div class="aboutbox">
+      <button class="btn closeabout" id="about-close" type="button">Close</button>
+      <p class="handnote" id="ceiling"><b>A teaching tool, not a ball flight simulator.</b>
+        It shows how bat speed, attack angle, horizontal attack angle, horizontal bat angle, tilt and where
+        the barrel meets the ball work together to send the ball up or down, pull or oppo. Every ball is met on the sweet spot,
+        so read exit velocity as the best that swing can do, not its average. Results are kept inside what
+        real 2025 MLB batted balls did, but the lesson is which way each slider moves the ball, not the
+        exact number.</p>
+      <div class="body">
+          <p><b>Swing.</b> The sliders set the bat's speed and angles at contact, the way Statcast measures
+        them. The drawn bat path is a reconstruction around contact, not motion capture.</p>
+          <p><b>Contact.</b> The ball comes off a round barrel. Meet it below center and it leaves higher
+        with backspin; above center and it leaves lower with topspin. At offset 0 the ball launches where
+        2025's squared-up balls launched for that attack angle.</p>
+          <p><b>Direction.</b> Where the barrel faces (horizontal bat angle) sets where the ball goes.
+        Where the path moves (horizontal attack angle) sets how hard it is hit: the ball comes off
+        hardest when the path runs the way the ball goes. In real swings the face turns about 1.2&deg; for
+        every 1&deg; of path, so the two move together; tick "Face turns with path" to see that. The default
+        face, 10&deg; toward pull of a straight path, puts landing spots where 2025 hard-hit balls landed.
+        Face and path figures come from 16,248 Driveline motion-capture swings.</p>
+          <p><b>Flight.</b> Drag and lift follow Alan Nathan's trajectory calculator. Exit velocity never
+        tops the hardest 2025 ball at that launch angle, and carry lands on the 2025 median for that exit
+        velocity, launch angle and direction. Generic park: 330 / 375 / 400, 8 ft wall, no wind.</p>
+          <p><b>Limits.</b> No timing and no mishits along the barrel: every ball is one clean collision.
+        Barrel offset and horizontal bat angle are not in public Statcast data, so treat them as inputs to explore.
+        Spin is described in words, not rpm, because no public data measures batted-ball sidespin. Real
+        balls with the same exit velocity and launch angle land 20 to 50 ft apart with spin, weather and
+        park; this shows the typical one.</p>
+          <p><b>On screen.</b> The white arrow is where the barrel is moving (horizontal attack angle), the
+        green arrow is where it faces (horizontal bat angle), and the blue line is where the ball starts.
+        The bat path drawn is a reconstruction from the measured angles, not motion capture.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+"use strict";
+const DATA = {"meta":{"source":"Baseball Savant (Statcast) pitch-level search","season":2025,"scope":"Full 2025 regular season","pitches_in_sample":712528,"tracked_swings_in_sample":330422,"competitive_swings_in_sample":299014,"min_swings_per_hitter":200,"note":"Full 2025 regular season. Bat paths drawn in the tool are reconstructions from these measured values, not motion capture."},"distributions":{"bat_speed":{"lo":50,"hi":90,"nbins":24,"width":1.6667,"counts":[27,33,119,260,634,1465,3460,6666,11300,18661,27198,33265,41602,43368,36761,30916,20277,11207,6103,3026,1457,870,300,0],"n":299014},"swing_length":{"lo":4,"hi":11,"nbins":24,"width":0.2917,"counts":[9,67,264,886,2511,6070,11715,19155,27126,34395,39057,26713,37969,33607,25955,17677,9701,4292,1398,311,72,26,8,4],"n":299014},"attack_angle":{"lo":-30,"hi":40,"nbins":24,"width":2.9167,"counts":[100,139,272,610,1209,2392,4342,7237,11520,16763,22855,27730,31443,32776,32045,28583,24117,19145,14193,9931,6043,3152,1498,567],"n":299014},"swing_path_tilt":{"lo":0,"hi":60,"nbins":24,"width":2.5,"counts":[1,17,46,175,423,1187,2909,6156,11956,19909,29553,38445,43516,42561,36853,28241,18520,10193,4999,2119,804,280,88,25],"n":299014},"attack_direction":{"lo":-45,"hi":45,"nbins":24,"width":3.75,"counts":[3514,3111,4245,5837,7659,10125,12917,15926,18806,21512,23872,24969,25598,24826,22948,19876,16100,12172,8763,5839,3705,2121,1236,651],"n":299014}}};
+/* 2025 MLB regular season, every tracked batted ball (mlb_db mirror of Statcast).
+   cap[i]: hardest exit velocity hit within 3 deg of launch angle cap_la0 + i.
+   carry[a][b]: median distance of fly balls, line drives and pop-ups (Coors out)
+   within 2 mph and 2 deg of EV ev0 + a*step, LA la0 + b*step. The filled_cells
+   with under 30 real balls (mostly 116+ mph) continue their own launch-angle
+   column linearly in exit velocity from the six nearest real cells. */
+const TAB = {"cap_la0": -30, "cap": [115.5, 115.5, 115.6, 115.6, 115.6, 115.6, 115.6, 117.2, 117.2, 117.2, 117.2, 117.2, 117.2, 117.2, 116.4, 116.4, 116.4, 116.4, 116.2, 116.2, 120.4, 120.4, 120.4, 120.4, 120.4, 120.4, 120.4, 117.9, 119.6, 119.6, 119.6, 119.6, 119.6, 119.6, 119.6, 119.0, 119.0, 119.0, 119.0, 119.0, 119.4, 119.4, 119.6, 119.6, 119.6, 119.6, 119.6, 120.4, 120.4, 120.4, 122.9, 122.9, 122.9, 122.9, 122.9, 122.9, 122.9, 117.4, 117.9, 119.9, 119.9, 119.9, 119.9, 119.9, 119.9, 119.9, 115.2, 115.2, 115.2, 116.3, 116.3, 116.3, 116.3, 117.7, 117.7, 117.7, 117.7, 117.7, 117.7, 117.7, 110.3, 110.3, 110.3, 115.1, 115.1, 115.1, 115.1, 115.1, 115.1, 115.1, 110.6, 110.6, 109.2, 109.2, 109.2, 109.2, 109.2, 109.2, 109.2, 105.4, 104.7, 104.7, 104.7, 104.5, 104.5, 103.5, 103.5, 103.5, 103.5, 101.4, 101.4], "ev0": 60, "la0": 10, "step": 2, "carry": [[79, 105, 121, 128, 140, 147, 152, 161, 169, 174, 178, 180, 182, 182, 182, 180, 179, 174, 168, 166, 161, 156, 145, 143, 140, 133, 119, 112, 106, 95, 91], [86, 111, 127, 135, 146, 156, 164, 169, 179, 186, 188, 190, 190, 189, 188, 187, 184, 181, 178, 170, 169, 161, 153, 148, 142, 136, 130, 118, 112, 100, 96], [93, 118, 131, 141, 156, 166, 172, 181, 190, 195, 199, 202, 200, 200, 199, 195, 194, 192, 188, 179, 173, 168, 161, 155, 149, 142, 136, 127, 114, 103, 93], [101, 121, 139, 147, 160, 170, 181, 190, 199, 205, 209, 211, 210, 210, 209, 205, 202, 198, 194, 190, 181, 175, 168, 161, 153, 145, 137, 130, 115, 106, 94], [108, 129, 146, 156, 166, 179, 189, 200, 208, 213, 219, 220, 220, 222, 218, 214, 211, 206, 201, 194, 190, 181, 175, 165, 157, 147, 141, 132, 120, 109, 99], [114, 140, 151, 162, 172, 188, 199, 210, 217, 224, 228, 232, 233, 232, 228, 223, 219, 215, 207, 201, 196, 189, 180, 172, 162, 154, 145, 134, 125, 116, 102], [124, 144, 156, 168, 182, 196, 210, 220, 230, 237, 242, 243, 243, 238, 235, 231, 227, 222, 216, 209, 202, 194, 189, 177, 168, 158, 148, 139, 130, 118, 105], [129, 149, 160, 173, 190, 204, 219, 232, 239, 245, 249, 251, 252, 249, 243, 241, 237, 231, 225, 217, 209, 202, 195, 185, 174, 163, 153, 143, 132, 122, 107], [135, 151, 164, 179, 201, 215, 231, 240, 249, 255, 261, 262, 260, 259, 254, 251, 245, 238, 233, 225, 218, 208, 199, 190, 177, 167, 158, 146, 135, 126, 108], [144, 158, 172, 190, 208, 226, 238, 248, 260, 267, 270, 271, 271, 268, 262, 257, 253, 247, 237, 231, 223, 215, 204, 196, 183, 172, 163, 149, 137, 127, 112], [151, 165, 178, 197, 219, 234, 248, 261, 270, 277, 280, 281, 280, 275, 271, 266, 259, 254, 244, 236, 229, 219, 210, 200, 188, 178, 167, 154, 139, 128, 117], [153, 168, 183, 206, 227, 243, 258, 270, 280, 287, 290, 290, 289, 284, 279, 275, 266, 260, 252, 244, 235, 226, 216, 204, 191, 181, 172, 159, 142, 130, 118], [157, 172, 193, 216, 236, 254, 268, 280, 291, 297, 299, 298, 296, 293, 288, 282, 274, 266, 259, 249, 240, 232, 222, 211, 198, 184, 174, 160, 147, 131, 117], [161, 178, 201, 224, 247, 263, 276, 291, 301, 307, 308, 307, 305, 301, 295, 289, 282, 273, 265, 257, 246, 237, 226, 214, 202, 188, 175, 162, 150, 132, 118], [164, 184, 209, 234, 257, 273, 289, 301, 311, 316, 318, 318, 315, 309, 304, 297, 289, 282, 272, 262, 252, 242, 230, 217, 206, 193, 176, 164, 150, 134, 117], [168, 191, 217, 240, 267, 284, 300, 313, 321, 324, 326, 327, 323, 317, 311, 305, 297, 288, 279, 270, 258, 248, 236, 222, 210, 197, 179, 166, 151, 138, 117], [173, 197, 225, 252, 275, 294, 309, 320, 329, 335, 336, 336, 332, 325, 319, 312, 304, 296, 285, 276, 265, 253, 241, 227, 214, 199, 184, 170, 155, 139, 122], [177, 204, 233, 261, 285, 303, 320, 333, 342, 346, 348, 346, 342, 335, 327, 320, 311, 303, 292, 280, 269, 255, 245, 231, 218, 202, 186, 172, 157, 136, 122], [183, 211, 243, 271, 294, 314, 331, 344, 351, 356, 358, 356, 352, 345, 336, 328, 319, 309, 299, 287, 275, 262, 248, 234, 223, 208, 187, 168, 157, 143, 124], [187, 218, 249, 279, 303, 326, 343, 354, 362, 367, 367, 365, 361, 353, 345, 336, 326, 316, 305, 294, 282, 268, 258, 242, 224, 210, 197, 174, 160, 147, 124], [193, 223, 257, 286, 313, 338, 352, 365, 373, 377, 377, 375, 371, 364, 354, 345, 334, 323, 313, 301, 288, 272, 261, 249, 225, 211, 206, 183, 164, 146, 127], [196, 228, 264, 295, 322, 346, 361, 375, 384, 388, 389, 387, 381, 373, 365, 354, 344, 332, 321, 307, 293, 279, 265, 246, 232, 214, 199, 187, 168, 149, 128], [199, 233, 270, 304, 331, 356, 371, 385, 393, 396, 396, 395, 389, 381, 372, 363, 353, 340, 328, 313, 300, 290, 272, 247, 234, 218, 208, 188, 169, 151, 130], [206, 240, 277, 312, 340, 365, 381, 395, 403, 407, 407, 404, 399, 391, 383, 374, 360, 343, 334, 331, 308, 294, 277, 254, 237, 220, 212, 192, 172, 153, 131], [210, 245, 285, 317, 347, 372, 390, 404, 413, 416, 415, 413, 408, 402, 391, 384, 369, 354, 340, 334, 313, 301, 282, 257, 240, 223, 216, 195, 174, 155, 133], [213, 250, 292, 323, 356, 382, 396, 410, 419, 423, 424, 425, 420, 413, 400, 385, 372, 360, 348, 342, 320, 307, 288, 261, 243, 226, 220, 199, 177, 157, 135], [220, 258, 297, 332, 362, 385, 400, 418, 424, 429, 430, 435, 427, 425, 409, 398, 383, 368, 355, 350, 326, 314, 293, 264, 246, 229, 224, 202, 179, 159, 136], [224, 265, 312, 344, 362, 383, 410, 426, 434, 440, 441, 444, 437, 434, 419, 406, 390, 375, 362, 358, 333, 320, 299, 268, 249, 232, 228, 206, 182, 161, 138], [240, 289, 320, 338, 373, 403, 417, 434, 442, 448, 449, 453, 447, 445, 428, 415, 398, 383, 369, 366, 339, 327, 304, 271, 252, 235, 233, 209, 184, 163, 139], [241, 289, 327, 350, 379, 404, 423, 442, 450, 456, 458, 463, 456, 455, 437, 423, 406, 390, 376, 374, 345, 333, 309, 275, 255, 237, 237, 213, 187, 165, 141], [247, 298, 336, 356, 386, 411, 430, 450, 457, 465, 466, 473, 466, 466, 446, 432, 414, 397, 383, 382, 352, 340, 315, 278, 258, 240, 241, 216, 189, 167, 143], [253, 307, 344, 362, 392, 417, 437, 458, 465, 473, 475, 482, 475, 476, 455, 441, 421, 405, 390, 390, 358, 347, 320, 282, 261, 243, 245, 220, 192, 169, 144]], "n_carry": 69252, "n_all": 235709, "filled_cells": 213};
+
+/* =====================================================================
+   3D renderer. Hand-written: the artifact CSP blocks every CDN, so
+   Three.js is unavailable. Yaw/pitch orbit camera, perspective divide,
+   painter's-algorithm depth sort, billboarded screen-space labels.
+
+   World coordinates follow Statcast convention, in feet:
+     x  toward the catcher's right   y  toward the pitcher   z  up
+   ===================================================================== */
+
+const V = {
+  add: (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]],
+  sub: (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]],
+  mul: (a,s) => [a[0]*s, a[1]*s, a[2]*s],
+  len: a => Math.hypot(a[0],a[1],a[2]),
+  norm(a){ const l = V.len(a) || 1; return [a[0]/l, a[1]/l, a[2]/l]; },
+  cross: (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
+};
+
+class Stage {
+  constructor(canvas, opts){
+    this.cv = canvas;
+    this._labels = [];
+    (window.__stages = window.__stages || []).push(this);
+    this.ctx = canvas.getContext("2d");
+    this.o = Object.assign({ yaw: -0.62, pitch: 0.30, dist: 13, target: [0, 1.6, 2.6] }, opts||{});
+    this.yaw = this.o.yaw; this.pitch = this.o.pitch; this.dist = this.o.dist;
+    this.target = this.o.target.slice();
+    this.prims = [];
+    this.tween = null;
+    this.bindInput();
+    this.resize();
+    addEventListener("resize", () => { this.resize(); this.render(); });
+  }
+
+  resize(){
+    const r = this.cv.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    this.w = Math.max(1, Math.round(r.width));
+    this.h = Math.max(1, Math.round(r.height));
+    this.cv.width  = Math.round(this.w * dpr);
+    this.cv.height = Math.round(this.h * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  bindInput(){
+    let drag = false, lx = 0, ly = 0;
+    const down = e => {
+      drag = true;
+      const p = e.touches ? e.touches[0] : e;
+      lx = p.clientX; ly = p.clientY;
+      this.tween = null;
+    };
+    const move = e => {
+      if(!drag) return;
+      const p = e.touches ? e.touches[0] : e;
+      this.yaw   += (p.clientX - lx) * 0.008;
+      this.pitch += (p.clientY - ly) * 0.006;
+      // Clamp short of the poles: at exactly +/-90 the up vector degenerates
+      // and the scene flips inside out.
+      this.pitch = Math.max(this.minPitch(), Math.min(1.45, this.pitch));
+      lx = p.clientX; ly = p.clientY;
+      if(e.cancelable) e.preventDefault();
+      this.render();
+    };
+    const up = () => { drag = false; };
+    this.cv.addEventListener("mousedown", down);
+    addEventListener("mousemove", move);
+    addEventListener("mouseup", up);
+    // touch-action:none on the canvas keeps page scroll working elsewhere.
+    this.cv.addEventListener("touchstart", down, {passive:true});
+    this.cv.addEventListener("touchmove", move, {passive:false});
+    this.cv.addEventListener("touchend", up);
+    this.cv.addEventListener("wheel", e => {
+      this.dist = Math.max(5, Math.min(34, this.dist + Math.sign(e.deltaY) * 0.9));
+      this.pitch = Math.max(this.pitch, this.minPitch());
+      e.preventDefault();
+      this.render();
+    }, {passive:false});
+  }
+
+  camTo(yaw, pitch, dist, ms){
+    if(matchMedia("(prefers-reduced-motion: reduce)").matches || !ms){
+      this.yaw = yaw; this.pitch = pitch; this.dist = dist;
+      this.render(); return;
+    }
+    const t0 = performance.now();
+    const a = {yaw:this.yaw, pitch:this.pitch, dist:this.dist};
+    const id = {};
+    this.tween = id;
+    const step = now => {
+      if(this.tween !== id) return;               // a drag cancelled us
+      const k = Math.min(1, (now - t0) / ms);
+      const e = k < .5 ? 2*k*k : 1 - Math.pow(-2*k+2, 2)/2;   // ease in-out
+      this.yaw   = a.yaw   + (yaw   - a.yaw)   * e;
+      this.pitch = a.pitch + (pitch - a.pitch) * e;
+      this.dist  = a.dist  + (dist  - a.dist)  * e;
+      this.render();
+      if(k < 1) requestAnimationFrame(step); else this.tween = null;
+    };
+    requestAnimationFrame(step);
+  }
+
+  /* camera basis, rebuilt each render */
+  /* The lowest the camera may look up from: its eye stays half a foot above the
+     ground. Below that the field is seen from underneath and the flight reads
+     upside down. */
+  minPitch(){
+    return Math.asin(Math.max(-1, Math.min(1, (0.5 - this.target[2]) / this.dist)));
+  }
+
+  basis(){
+    const pitch = Math.max(this.pitch, this.minPitch());   // also guards camera moves made in code
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const cy = Math.cos(this.yaw),   sy = Math.sin(this.yaw);
+    const fwd = [ -cp*sy, -cp*cy, -sp ];          // camera looks toward target
+    const eye = V.sub(this.target, V.mul(fwd, this.dist));
+    const right = V.norm(V.cross(fwd, [0,0,1]));
+    const up = V.cross(right, fwd);
+    return {eye, fwd, right, up};
+  }
+
+  project(p, b){
+    const d = V.sub(p, b.eye);
+    const z = d[0]*b.fwd[0] + d[1]*b.fwd[1] + d[2]*b.fwd[2];      // depth
+    if(z <= 0.05) return null;                                     // behind camera
+    const x = d[0]*b.right[0] + d[1]*b.right[1] + d[2]*b.right[2];
+    const y = d[0]*b.up[0]    + d[1]*b.up[1]    + d[2]*b.up[2];
+    const v = this.frame || {x: this.w/2, y: this.h/2, h: this.h};   // the part of the canvas not under panels
+    const f = (v.h * 0.9) / z;                                     // focal / perspective divide
+    return { x: v.x + x*f, y: v.y - y*f, z, s: f };
+  }
+
+  clear(){ this.prims = []; }
+  // g: draw group (see render); leave it unset to sort on depth with the scene.
+  line(a, b, color, width, alpha, g){
+    this.prims.push({k:"line", a, b, color, width: width||1.4, alpha: alpha==null?1:alpha, g});
+  }
+  // cull: one-sided, drawn only from the side where its corners run clockwise on screen.
+  poly(pts, fill, stroke, alpha, g, cull){
+    this.prims.push({k:"poly", pts, fill, stroke, alpha: alpha==null?1:alpha, g, cull});
+  }
+  dot(p, color, r, g){ this.prims.push({k:"dot", p, color, r: r||4, g}); }
+  label(p, text, color, dy, size, g){
+    this.prims.push({k:"label", p, text, color, dy: dy||0, size: size||11, g});
+  }
+
+  render(){
+    const b = this.basis(), g = this.ctx;
+    this._labels = [];              // repopulated each frame for the preflight check
+    g.clearRect(0, 0, this.w, this.h);
+    if(this.o.sky){                 // a night sky, darkest overhead
+      const sky = g.createLinearGradient(0, 0, 0, this.h);
+      sky.addColorStop(0, "#070B16"); sky.addColorStop(1, "#27314A");
+      g.fillStyle = sky;
+    } else g.fillStyle = "#000000";
+    g.fillRect(0, 0, this.w, this.h);
+
+    // Project, clip anything that crosses behind the camera, sort far -> near.
+    // Clipping rather than dropping: near the plate the camera stands inside the
+    // ground mesh, and a dropped quad left a black hole in the dirt.
+    const NEAR = 0.05;
+    const cam = q => { const d = V.sub(q, b.eye);
+      return [d[0]*b.right[0] + d[1]*b.right[1] + d[2]*b.right[2],
+              d[0]*b.up[0]    + d[1]*b.up[1]    + d[2]*b.up[2],
+              d[0]*b.fwd[0]   + d[1]*b.fwd[1]   + d[2]*b.fwd[2]]; };
+    const cut = (a, c) => { const t = (NEAR - a[2])/(c[2] - a[2]);
+      return [a[0] + (c[0]-a[0])*t, a[1] + (c[1]-a[1])*t, NEAR]; };
+    const v = this.frame || {x: this.w/2, y: this.h/2, h: this.h};
+    const scr = c => { const f = (v.h * 0.9) / c[2];
+      return { x: v.x + c[0]*f, y: v.y - c[1]*f, z: c[2], s: f }; };
+    const drawable = [];
+    for(const p of this.prims){
+      let depth, proj;
+      if(p.k === "line"){
+        let A = cam(p.a), B = cam(p.b);
+        if(A[2] < NEAR && B[2] < NEAR) continue;
+        if(A[2] < NEAR) A = cut(A, B); else if(B[2] < NEAR) B = cut(B, A);
+        proj = [scr(A), scr(B)]; depth = (A[2] + B[2]) / 2;
+      } else if(p.k === "poly"){
+        const cs = p.pts.map(cam), out = [];
+        for(let i=0;i<cs.length;i++){
+          const a = cs[i], c = cs[(i+1) % cs.length];
+          if(a[2] >= NEAR) out.push(a);
+          if((a[2] >= NEAR) !== (c[2] >= NEAR)) out.push(cut(a, c));
+        }
+        if(out.length < 3) continue;
+        proj = out.map(scr); depth = out.reduce((s,q) => s + q[2], 0) / out.length;
+        if(p.cull){
+          let area = 0;
+          for(let i=0;i<proj.length;i++){
+            const u = proj[i], v = proj[(i+1) % proj.length];
+            area += u.x*v.y - v.x*u.y;
+          }
+          if(area > 0) continue;                    // its back is to the camera
+        }
+      } else {
+        const A = this.project(p.p, b);
+        if(!A) continue;
+        proj = [A]; depth = A.z;
+      }
+      drawable.push({p, proj, depth, g: p.g == null ? 10 : p.g});
+    }
+    /* Group first, then far -> near inside the group. The ground is a stack
+       of coplanar layers -- turf, the skinned infield, the grass diamond,
+       the cutouts, the paint -- and depth cannot order those: an inch of
+       lift is worth about a hundredth of the depth that a foot of horizontal
+       position is worth, so a plain depth sort tears them into each other.
+       Groups make that stack explicit. Anything that is not ground leaves g
+       unset, sorts on depth exactly as before, and lands on top. */
+    drawable.sort((m, n) => (m.g - n.g) || (n.depth - m.depth));
+
+    for(const d of drawable){
+      const p = d.p, q = d.proj;
+      g.globalAlpha = p.alpha == null ? 1 : p.alpha;
+      if(p.k === "line"){
+        g.strokeStyle = p.color; g.lineWidth = p.width; g.lineCap = "round";
+        g.beginPath(); g.moveTo(q[0].x, q[0].y); g.lineTo(q[1].x, q[1].y); g.stroke();
+      } else if(p.k === "poly"){
+        g.beginPath(); g.moveTo(q[0].x, q[0].y);
+        for(let i=1;i<q.length;i++) g.lineTo(q[i].x, q[i].y);
+        g.closePath();
+        if(p.fill){ g.fillStyle = p.fill; g.fill(); }
+        if(p.stroke){ g.strokeStyle = p.stroke; g.lineWidth = 1.2; g.stroke(); }
+      } else if(p.k === "dot"){
+        g.fillStyle = p.color;
+        g.beginPath(); g.arc(q[0].x, q[0].y, p.r, 0, 6.2832); g.fill();
+      } else {
+        // Billboarded: screen space, constant size, never rotated into the scene.
+        g.fillStyle = p.color;
+        g.font = '500 ' + p.size + 'px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+        g.textAlign = "center"; g.textBaseline = "middle";
+        const lx = q[0].x, ly = q[0].y + p.dy;
+        // A dark halo keeps every label readable on grass, clay or seats alike.
+        g.lineWidth = 3; g.strokeStyle = "rgba(0,0,0,.65)"; g.lineJoin = "round";
+        g.strokeText(p.text, lx, ly);
+        g.fillText(p.text, lx, ly);
+        // Recorded so the preflight check can catch labels colliding with each
+        // other. Two of these overlapped in earlier versions and only a
+        // screenshot caught it.
+        const w = g.measureText(p.text).width;
+        this._labels.push({text: p.text, size: p.size,
+                           x: lx - w/2, y: ly - p.size/2, w: w, h: p.size});
+      }
+    }
+    g.globalAlpha = 1;
+  }
+}
+
+/* ---------- scene furniture ---------- */
+const C = { accent:"#7CC4F2", accent2:"#3E8FC9", grid:"#262626", muted:"#9CA3AF",
+            foot:"#6B7280", white:"#FFFFFF", green:"#10B981", red:"#EF4444",
+            dist:"#D1D5DB", athens:"#F4F4F5", mineshaft:"#262626",
+            footnote:"#6B7280" };
+
+function drawGround(st, hand){
+
+  // Home plate, real dimensions: a 17 in edge facing the PITCHER, two 8.5 in
+  // sides, and two 12 in sides meeting at an apex that points back at the
+  // CATCHER. The apex sits on the origin and the front edge lands on
+  // y = 17/12 ft, which is exactly where Statcast measures plate_x / plate_z.
+  const p = 17/24;
+  st.poly([[0,0,0.02],[-p,p,0.02],[-p,2*p,0.02],[p,2*p,0.02],[p,p,0.02]],
+          "#E8E8E8", "#E8E8E8", 1, 4);
+
+  // Batter's boxes: 4 ft x 6 ft, inside edge 6 in off the plate, centered on the
+  // middle of the plate. The occupied one is drawn brighter, so which side the
+  // hitter stands on is visible in the scene rather than only in a label.
+  const inner = (p*12 + 6)/12, outer = inner + 4;
+  const yc = p, y0 = yc - 3, y1 = yc + 3;
+  for(const s of [-1, 1]){
+    const active = (s < 0) === (hand !== "L");   // RHH at -x, LHH at +x
+    // Reference, not subject: keep the boxes quieter than the bat and the path.
+    const a = active ? .4 : .16, wt = active ? 1.2 : 1;
+    const box = [[s*inner, y0], [s*outer, y0], [s*outer, y1], [s*inner, y1]];
+    for(let i=0;i<4;i++){
+      const q = box[i], r = box[(i+1)%4];
+      st.line([q[0],q[1],0.03], [r[0],r[1],0.03],
+              "#F4F4F5", wt, active ? .95 : .55);   // crisp chalk on the lighter clay
+    }
+    if(active)
+      st.label([s*(inner+2), y1 - 0.35, 0.02],
+               (hand === "L" ? "LHH" : "RHH"), C.muted, 0, 10);
+  }
+}
+
+/* =====================================================================
+   Bat path reconstruction.
+
+   Savant publishes scalars per swing, never a trajectory. This model is
+   the smallest thing consistent with those scalars: the barrel travels a
+   circular arc lying in a plane tilted from horizontal by `tilt`, and we
+   pick the point on that arc where the tangent's vertical angle equals the
+   measured `attackAngle`. The plane is then spun about vertical so the
+   tangent's horizontal bearing equals the measured `attackDir`.
+
+   Real, from measurement: attackAngle, tilt, attackDir, length, contact point.
+   Ours, invented: circular arc, the 2.6 ft radius, everything before contact.
+   ===================================================================== */
+const R_BAT = 4.2;   // ft, rotation axis to barrel tip: arms plus bat. A
+                     // modeling choice, not a measured quantity. At 3.2 a
+                     // 34 in bat put the knob almost on the pivot.
+
+// Rodrigues: rotate v about unit axis k by angle s.
+function rot(v, k, s){
+  const c = Math.cos(s), si = Math.sin(s);
+  const kv = V.cross(k, v);
+  const kd = k[0]*v[0] + k[1]*v[1] + k[2]*v[2];
+  return [
+    v[0]*c + kv[0]*si + k[0]*kd*(1-c),
+    v[1]*c + kv[1]*si + k[1]*kd*(1-c),
+    v[2]*c + kv[2]*si + k[2]*kd*(1-c),
+  ];
+}
+
+function batPath(prm){
+  const aa   = prm.attackAngle * Math.PI/180;
+  const tilt = Math.min(88, Math.max(3, prm.tilt)) * Math.PI/180;
+  const hand = prm.stand === "L" ? -1 : 1;
+  const contact = prm.contact || [0, 2.2, 2.5];
+  const len = Math.max(3, prm.length);
+
+  // Bearing of the barrel at contact, measured from straight-back-at-the-pitcher
+  // (+y) toward the catcher's right (+x). Savant normalizes horizontal attack angle so
+  // negative is the pull side for both hands; pull is -x for a righty and +x for
+  // a lefty, which is exactly what multiplying by `hand` does.
+  const bear = hand * prm.attackDir * Math.PI/180;
+
+  // Barrel velocity direction at contact. This is fully determined by the two
+  // measured angles, so the tangent is exact -- only the curve around it is ours.
+  const T = [ Math.cos(aa)*Math.sin(bear), Math.cos(aa)*Math.cos(bear), Math.sin(aa) ];
+
+  // Swing-plane normal n: perpendicular to T, and tipped from vertical by the
+  // measured tilt (a plane's tilt from horizontal is its normal's angle from up).
+  //   n . T = 0 ,  n_z = cos(tilt) ,  |n| = 1
+  const hlen = Math.hypot(T[0], T[1]) || 1e-6;
+  const hh = [T[0]/hlen, T[1]/hlen];              // horizontal heading of T
+  const p = -Math.cos(tilt) * Math.tan(aa);       // component of n along hh
+  const s2 = Math.sin(tilt)*Math.sin(tilt) - p*p; // remainder, perpendicular
+  const q = Math.sqrt(Math.max(0, s2));
+  // hh rotated +90 deg in the xy plane
+  const hp = [-hh[1], hh[0]];
+
+  // Four sign branches satisfy the constraints: q may be +/- (two planes with
+  // the same tilt), and n may be negated (same plane, opposite orientation).
+  // They are not interchangeable -- the wrong branch puts the rotation axis on
+  // the first-base side of a righty, so the bat sweeps in from in front of the
+  // hitter instead of from behind them. Pick the branch whose axis sits toward
+  // the batter and above the barrel, which is where a spine actually is.
+  let best = null;
+  for(const qs of [1, -1]){
+    for(const ns of [1, -1]){
+      const n2 = V.norm([ ns*(p*hh[0] + qs*q*hp[0]),
+                          ns*(p*hh[1] + qs*q*hp[1]),
+                          ns*Math.cos(tilt) ]);
+      const rc2 = V.norm(V.cross(n2, T));
+      const score = (rc2[0] * -hand) + 0.7 * rc2[2];
+      if(!best || score > best.score) best = {n: n2, rc: rc2, score};
+    }
+  }
+  const n = best.n, rc = best.rc;
+
+  const C = V.add(contact, V.mul(rc, R_BAT));     // center of rotation
+  const r0 = V.sub(contact, C);                   // contact, relative to center
+
+  // Which way round the axis is forward in time. d/ds of the rotation at s=0 is
+  // n x r0; forward is whichever sign points along T.
+  const drv = V.cross(n, r0);
+  const fwd = (drv[0]*T[0] + drv[1]*T[1] + drv[2]*T[2]) >= 0 ? 1 : -1;
+
+  // Savant measures the plane -- attack angle, tilt, direction -- at contact, and
+  // swing length as a total distance. It says nothing about the shape of the path
+  // back at the start of the swing, so drawing the full arc invented a vertical
+  // barrel and a downswing nobody measured. Draw only the window into contact
+  // that the measured angles actually describe, and stop there.
+  /* The shown window is a fixed share of the measured swing length, so the
+     tracked metric sets how much path there is instead of a magic constant.
+     0.43 reproduces the 0.75 rad window at the league-average 7.3 ft. */
+  const THROUGH_ARC  = 0.30;                      // a little past contact, so the
+                                                  // barrel keeps working rather than
+                                                  // stopping dead on the ball
+  const back = Math.max(0.30, Math.min(1.00, 0.43 * len / R_BAT));
+  const total = back + THROUGH_ARC;
+  const N = 96, out = [];
+  for(let i=0;i<=N;i++){
+    // Walk from the start of the shown window, through contact, and a little past.
+    const u = (-back + total * (i/N)) * fwd;
+    out.push(V.add(C, rot(r0, n, u)));
+  }
+  return { pts: out, contact, contactFrac: back / total,
+           tangent: T, center: C, normal: n, axisR: rc };
+}
+
+function drawBat(st, path, frac, color){
+  const pts = path.pts, n = pts.length;
+  // The transport loops past 1.0 to hold on the finished swing for a beat;
+  // clamp here so we never index past the end of the path.
+  const k = Math.max(0, Math.min(1, frac));
+  const upto = Math.max(1, Math.round((n-1) * k));
+
+  // Ghost of the whole path while the swing is still in progress. Without it an
+  // early frame is a bat floating in the dark with nothing to place it against.
+  if(k < 0.995){
+    for(let i=0;i<n-1;i++) st.line(pts[i], pts[i+1], C.foot, 1, .16);
+  }
+  // Trail fades so the recent part of the motion reads brightest.
+  for(let i=0;i<upto;i++){
+    const k = i / (n-1);
+    st.line(pts[i], pts[i+1], color || C.accent, 1 + 2.6*k, 0.16 + 0.76*k*k);
+  }
+  const head = pts[upto];
+  drawBatObject(st, path, head);
+  return head;
+}
+
+/* A real bat, not a line. The barrel end rides the tracked path; the bat lies
+   along the radius back toward the rotation axis, which is where the hands are.
+   Because the axis mirrors correctly between hands (asserted in the tests), the
+   bat's orientation mirrors with it -- a lefty's bat leans the other way with no
+   special-casing here. */
+const BAT_LEN = 34/12;          // 34 in, a common big-league length
+const BAT_SWEET_U = 1 - 6/34;   // sweet spot, 6 in back from the tip
+
+/* Bat profile: radius in INCHES at each fraction of the length, knob to tip.
+   Roughly a real wood bat -- knob flare, thin handle, taper, then the barrel. */
+// A bat is not a cone. The handle stays genuinely thin for most of its length,
+// transitions quickly, then the barrel runs near-constant to the end cap. An
+// earlier version ramped continuously and read as a pencil.
+const BAT_PROFILE = [
+  [0.000, 0.86],   // knob flare
+  [0.045, 0.45],
+  [0.430, 0.49],   // handle: nearly parallel this far out
+  [0.545, 0.66],
+  [0.650, 1.02],   // quick transition into the barrel
+  [0.750, 1.28],
+  [0.940, 1.35],   // barrel: full and near-constant
+  [0.988, 1.34],
+  [1.000, 1.20],   // flat end with a small edge fillet -- NOT a point
+];
+function batRadius(u){
+  // The barrel ends in a flat face. An earlier version domed it to zero radius
+  // over the last half inch, which made the bat read as a cone.
+  const t = Math.max(0, Math.min(1, u));
+  for(let i=0;i<BAT_PROFILE.length-1;i++){
+    const a = BAT_PROFILE[i], b = BAT_PROFILE[i+1];
+    if(t >= a[0] && t <= b[0]){
+      const k = (t - a[0]) / (b[0] - a[0]);
+      return (a[1] + (b[1] - a[1]) * k) / 12;
+    }
+  }
+  return BAT_PROFILE[BAT_PROFILE.length-1][1] / 12;
+}
+
+// Fixed light, from up and over the hitter's front shoulder.
+const LIGHT = V.norm([-0.45, -0.55, 0.72]);
+// Quantized into four palette steps rather than a gradient: the closed palette
+// has no in-between values, and faceting suits the brand better than a blend.
+//
+// All four steps are light enough to read on the black ground. An earlier ramp
+// bottomed out at mineshaft (#262626), which on black meant the unlit half of
+// the bat vanished and the silhouette read inside out.
+/* Maple, not chrome. The old ramp ran through the same greys as the chalk,
+   and with a real field under it the barrel read as one more foul line.
+   All four steps stay well clear of the clay and the turf underneath. */
+const WOOD = ["#F2DCBB", "#DDBE8C", "#BE9760", "#8A6941"];
+function shade(nrm){
+  const d = nrm[0]*LIGHT[0] + nrm[1]*LIGHT[1] + nrm[2]*LIGHT[2];
+  if(d > 0.55) return WOOD[0];
+  if(d > 0.25) return WOOD[1];
+  if(d > -0.10) return WOOD[2];
+  return WOOD[3];
+}
+
+/* Build the bat as a real tapered tube and hand the quads to the renderer,
+   which depth-sorts them with the rest of the scene. Volume and shading are
+   what make it read as a bat; a thick stroke never will. */
+function batQuads(path, head){
+  // `head` is the TRACKED point, which is the sweet spot -- not the tip. Savant
+  // reports bat speed at the barrel's sweet spot, about 6 in back from the end,
+  // so that is the point whose path we are drawing and the point that meets the
+  // ball. The tip therefore extends a few inches PAST contact.
+  // The bat normally lies along the radius, so its aim is whatever the path
+  // implies. hbaYaw swings it about the vertical through the sweet spot, which
+  // is how horizontal bat angle moves independently of the direction of travel.
+  let axis = V.norm(V.sub(head, path.center));       // knob -> tip
+  if(path.hbaYaw) axis = V.norm(rot(axis, [0,0,1], path.hbaYaw));
+  const knob = V.sub(head, V.mul(axis, BAT_LEN * BAT_SWEET_U));
+  // Two directions across the bat. Seed from the swing-plane normal so the
+  // ring is stable frame to frame instead of spinning as the bat moves.
+  let e1 = V.cross(axis, path.normal || [0,0,1]);
+  if(V.len(e1) < 1e-6) e1 = V.cross(axis, [0,0,1]);
+  e1 = V.norm(e1);
+  const e2 = V.norm(V.cross(axis, e1));
+
+  const NA = 16, NC = 9, quads = [];
+  const ring = u => {
+    const r = batRadius(u), c = V.add(knob, V.mul(axis, BAT_LEN * u)), out = [];
+    for(let j=0;j<NC;j++){
+      const a = (j / NC) * Math.PI * 2;
+      out.push(V.add(c, V.add(V.mul(e1, Math.cos(a)*r), V.mul(e2, Math.sin(a)*r))));
+    }
+    return out;
+  };
+  let prev = ring(0);
+  for(let i=1;i<=NA;i++){
+    const cur = ring(i / NA);
+    for(let j=0;j<NC;j++){
+      const k = (j + 1) % NC;
+      const p = [prev[j], prev[k], cur[k], cur[j]];
+      const nrm = V.norm(V.cross(V.sub(p[1], p[0]), V.sub(p[3], p[0])));
+      quads.push({pts: p, color: shade(nrm)});
+    }
+    prev = cur;
+  }
+
+  // Both ends are now open discs rather than closing to a point, so cap them.
+  // Without these you can see straight down the inside of the bat.
+  quads.push({pts: ring(1).slice().reverse(), color: shade(axis)});      // barrel face
+  quads.push({pts: ring(0), color: shade(V.mul(axis, -1))});             // knob face
+
+  return {quads, knob, axis, e1, e2};
+}
+
+function drawBatObject(st, path, head){
+  if(!path.center){ st.dot(head, C.accent, 5); return; }
+  const m = batQuads(path, head);
+  for(const q of m.quads) st.poly(q.pts, q.color, null, 1);
+
+  // The sweet spot band sits exactly on the tracked point, so it lands on the
+  // ball at contact instead of floating somewhere near it.
+  const r = batRadius(BAT_SWEET_U) * 1.07;
+  const c = head;
+  const band = [];
+  for(let j=0;j<12;j++){
+    const a = (j / 12) * Math.PI * 2;
+    band.push(V.add(c, V.add(V.mul(m.e1, Math.cos(a)*r), V.mul(m.e2, Math.sin(a)*r))));
+  }
+  for(let j=0;j<12;j++) st.line(band[j], band[(j+1)%12], C.accent, 2, 1);
+
+  // Ground track of the bat: a cheap, honest depth cue. Reading height in a
+  // projected 3D scene is near impossible without something on the floor.
+  const tip = V.add(m.knob, V.mul(m.axis, BAT_LEN));
+  st.line([m.knob[0], m.knob[1], 0.004], [tip[0], tip[1], 0.004],
+          C.foot, 2.2, .5);
+}
+
+function drawPitch(st, pp, frac, noDot){
+  const n = pp.pts.length;
+  const upto = Math.max(1, Math.round((n-1) * Math.min(1, frac)));
+  for(let i=0;i<upto;i++){
+    const k = i/(n-1);
+    st.line(pp.pts[i], pp.pts[i+1], C.white, 1 + 1.6*k, 0.14 + 0.7*k);
+  }
+  // Once the ball is off the bat the batted-ball dot takes over, so the pitch
+  // must not leave a second ball sitting at the contact point.
+  if(!noDot) st.dot(pp.pts[upto], C.white, 4.5);
+}
+
+const G_FT = 32.174;                    // ft/s^2
+
+/* Exposed so the headless geometry checks can drive the real renderer and the
+   real reconstruction instead of a copy that would drift from this file.
+   Read-only handles; nothing here changes page behavior. */
+window.__bp = { Stage, batPath, drawGround, V, R_BAT,
+                batQuads, batRadius, BAT_LEN, BAT_SWEET_U };
+
+/* ---------- transport: play / pause / scrub, shared by every scene ----------
+   One implementation rather than four copies. Owns the frame loop, keeps the
+   scrub slider in sync, and hands the current fraction back to a draw callback
+   so state changes elsewhere (sliders, handedness) can redraw at the same
+   moment in the swing. */
+function Transport(btn, slider, draw, opts){
+  const o = opts || {};
+  const step = o.step || 0.011;
+  let speed = o.speed == null ? 1 : o.speed;
+  const hold = o.hold || 1.18;          // run past 1.0 to rest on the finished swing
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let t = o.start == null ? 1 : o.start;
+  let playing = false;
+  let token = 0;                        // guards against stacked frame loops
+
+  function render(){
+    draw(Math.max(0, Math.min(1, t)));
+    if(slider) slider.value = Math.round(Math.max(0, Math.min(1, t)) * 1000);
+  }
+  function loop(mine){
+    if(!playing || mine !== token) return;
+    t += step*speed;
+    if(t > hold) t = 0.02;
+    render();
+    requestAnimationFrame(() => loop(mine));
+  }
+  function setPlaying(p){
+    playing = !!p && !reduce;
+    if(btn){
+      btn.textContent = playing ? "Pause" : "Play";
+      btn.setAttribute("aria-pressed", playing ? "true" : "false");
+      btn.classList.toggle("on", playing);
+    }
+    token++;
+    if(playing){ const mine = token; requestAnimationFrame(() => loop(mine)); }
+  }
+
+  if(btn){
+    btn.setAttribute("aria-pressed", "false");
+    btn.addEventListener("click", () => setPlaying(!playing));
+  }
+  if(slider){
+    slider.addEventListener("input", e => {
+      t = parseFloat(e.target.value) / 1000;
+      setPlaying(false);
+      render();
+    });
+  }
+  render();
+  if(o.autoplay && !reduce) setPlaying(true);
+  return { render, setPlaying, frac: () => Math.max(0, Math.min(1, t)),
+           isPlaying: () => playing, setSpeed(m){ speed = m; } };
+}
+
+/* ---------- camera presets ---------- */
+const CAMS = [
+  ["3/4",     -0.62, 0.30],
+  ["Side",    -1.57, 0.06],
+  ["Catcher",  0.00, 0.10],
+  ["Top",      0.00, 1.40],
+  ["Low",     -0.90, -0.22],
+];
+/* The preset yaws above are written for a left-handed hitter, who stands at +x
+   and so reads from the right-handed box at -x. A right-handed hitter is the
+   mirror image, so every off-axis preset -- and the scene's own opening angle --
+   flips sign with the hitter's side. Without this, "Side" on a RHH puts the
+   camera behind the hitter instead of across the plate from them.
+   handFn tells a scene whose handedness it follows: the global toggle by
+   default, or a specific tracked swing's stand where the swing is real. */
+function mountCams(el, stage, dist, handFn){
+  const hand = handFn || (() => HAND);
+  let applied = hand();
+  if(applied === "R") stage.yaw = -stage.yaw;
+  // Re-mirror when the scene's hitter switches sides. The caller renders after.
+  const sync = () => {
+    if(hand() === applied) return;
+    applied = hand();
+    stage.yaw = -stage.yaw;
+  };
+  CAMS.forEach(([name, yaw, pitch], i) => {
+    const b = document.createElement("button");
+    b.className = "btn" + (i === 0 ? " on" : "");
+    b.textContent = name;
+    b.onclick = () => {
+      el.querySelectorAll(".btn").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      applied = hand();
+      stage.camTo(applied === "R" ? -yaw : yaw, pitch, dist || stage.o.dist, 620);
+    };
+    el.appendChild(b);
+  });
+  if(!handFn) onHand(sync);
+  return sync;
+}
+
+/* ---------- small helpers ---------- */
+const $ = id => document.getElementById(id);
+const fmt = (v, d) => (v == null || isNaN(v)) ? "\u2014" : Number(v).toFixed(d == null ? 1 : d);
+function stats(el, arr){
+  el.innerHTML = arr.map(s =>
+    '<div class="stat"' + (s[4] ? ' title="' + s[4] + '"' : '') + '><div class="k">' + s[0] + '</div><div class="v' +
+    (s[3] ? " hi" : "") + '">' + s[1] +
+    (s[2] ? '<span class="u"> ' + s[2] + '</span>' : '') + '</div></div>').join("");
+}
+/* Global batter handedness. Drives the two parametric teaching scenes and
+   filters the hitter scatter. Sections built on specific real swings keep the
+   handedness those swings were actually taken with -- mirroring measured data
+   to match a toggle would be a lie. */
+let HAND = "R";
+const handSubs = [];
+function onHand(fn){ handSubs.push(fn); }
+{
+  const seg = $("handseg");
+  seg.querySelectorAll("button").forEach(b => {
+    b.addEventListener("click", () => {
+      HAND = b.getAttribute("data-hand");
+      seg.querySelectorAll("button").forEach(x =>
+        x.classList.toggle("on", x === b));
+      handSubs.forEach(fn => fn(HAND));
+    });
+  });
+}
+
+
+/* ======================= BAT PATH LAB =======================
+   Every slider feeds one model. Nothing here is independent:
+   where you meet the ball changes the angles the barrel arrives with,
+   those angles plus the pitch decide the collision, and the collision
+   decides exit velocity, launch angle, direction and carry. */
+{
+  const st = new Stage($("c-lab"), {dist:6.2, yaw:-0.78, pitch:0.20, target:[0,2.45,2.75], sky:true});
+  /* Centre the scene in the open field between the floating panels, so the bat
+     never sits under one. On a phone nothing floats and the whole canvas is open. */
+  function frameScene(){
+    const app = $("lab"), cr = st.cv.getBoundingClientRect();
+    if(getComputedStyle(app).position !== "fixed"){ st.frame = null; return; }
+    const shown = sel => { const el = app.querySelector(sel); return el && el.offsetParent ? el.getBoundingClientRect() : null; };
+    const L = shown(".panel.left"), R = shown(".panel.right"), B = shown(".bottom"), T = shown(".topbar");
+    const x0 = L ? L.right - cr.left : 0, x1 = R ? R.left - cr.left : cr.width;
+    const y0 = T ? T.bottom - cr.top : 0, y1 = B ? B.top - cr.top : cr.height;
+    st.frame = {x: (x0 + x1)/2, y: (y0 + y1)/2, h: Math.max(200, y1 - y0), w: x1 - x0};
+  }
+  frameScene();
+  addEventListener("resize", () => { frameScene(); st.render(); });
+  $("panels-btn").addEventListener("click", () => {
+    const bare = $("lab").classList.toggle("bare");
+    $("panels-btn").textContent = bare ? "Show panels" : "Hide panels";
+    frameScene(); st.render();
+  });
+  const about = open => { $("about").hidden = !open; };
+  $("about-btn").addEventListener("click", () => about(true));
+  $("about-close").addEventListener("click", () => about(false));
+  $("about").addEventListener("click", e => { if(e.target === $("about")) about(false); });
+  addEventListener("keydown", e => { if(e.key === "Escape") about(false); });
+  mountCams($("cam-lab"), st, 6.2);
+
+  /* Contact sits at a fixed, typical spot: 29 in ahead of the hips, 2.5 ft up,
+     mid-plate. The swing angles are measured at contact, so where contact happens
+     does not change them, and nothing in the collision depends on it. */
+  const DEF = {bs:71.4, aa:8.5, tilt:32, len:7.3, dir:0, face:-10,
+               depth:12, height:2.5, side:0, off:0,
+               pv:93, pvaa:-6.0, phaa:0};
+  const S = Object.assign({}, DEF);
+  const SLIDERS = [["bs"," mph",1],["aa","°",1],["tilt","°",0],
+                   ["dir","°",1],["face","°",0],
+                   ["off"," in",2],["pv"," mph",0],["pvaa","°",1]];
+  const UNIT={}, DEC={};
+  SLIDERS.forEach(([k,u,d]) => { UNIT[k]=u; DEC[k]=d; });
+
+  /* Squared up, as 2025's squared-up balls were. For the top 3 percent of
+     224,436 tracked 2025 balls by collision efficiency, a median fit of launch
+     angle on attack angle (piecewise linear, knots every 10 deg), pitch descent
+     angle and tilt gives -5 deg at a -10 deg attack angle, 13 at 10, 21 at 20
+     and only 24 at 30: launch angle flattens on steep swings. OFF_SQ is the
+     offset, per 2.5 deg of attack angle from -10, that puts this collision on
+     that curve for the default swing and a -6 deg pitch. Barrel offset 0 on the
+     slider is that table; a flatter or steeper pitch then moves launch angle
+     0.6 deg per degree, as the same fit does (0.65). */
+  const OFF_SQ = [0.545,0.48,0.413,0.344,0.275,0.21,0.145,0.08,0.016,-0.06,
+                  -0.135,-0.208,-0.278,-0.385,-0.488,-0.585,-0.677];
+  function offSq(aa){
+    const x = Math.max(0, Math.min(OFF_SQ.length - 1.001, (aa + 10)/2.5)), i = Math.floor(x);
+    return OFF_SQ[i] + (OFF_SQ[i+1] - OFF_SQ[i])*(x - i);
+  }
+  function effective(){
+    return {aa: S.aa, tilt: S.tilt, dir: S.dir, hand: HAND === "L" ? -1 : 1,
+            off: S.off + offSq(S.aa)};
+  }
+
+  /* ---------------- the collision ----------------
+     A ball on a cylinder. The line of centers runs from the barrel's axis to
+     the ball's center, so it is always square to the barrel; the offset tips
+     it, about the barrel's own axis, by asin(offset / (ball + barrel radius)).
+     The barrel's axis comes off the reconstructed path, so a tilted swing
+     tilts it and the spin axis with it.
+
+     Along the line of centers, the standard bat-ball result: the ball leaves
+     with (1+q) of the barrel's speed into it plus q of the pitch's. q = 0.23 on
+     the pitch's speed at the plate reproduces Statcast's own "maximum possible
+     exit velocity" in all three worked examples in MLB's squared-up glossary
+     entry to within 0.5 mph. Real balls stop reaching it on the fastest swings:
+     at a fixed bat-plus-pitch speed, the 99.9th percentile of q in 2025 falls from
+     0.243 at 69 mph of bat speed to 0.211 at 84 (0.0022 per mph), while pitch
+     speed barely moves it. So q holds at 0.23 until that line drops below it, at
+     76.5 mph, and follows it down from there, whether the cause is the bat or the
+     measurement of the fastest swings.
+     Across it, friction. The ball keeps its own sliding velocity and the
+     contact takes back a fraction of the slip; the SAME impulse spins it, so
+     the speed lost across the face and the spin gained are tied together:
+     dv = g*(2/7)*slip and w = g*(5/7)*slip/r for a solid sphere, where g = 1
+     would be rolling without slip by the end of contact. g = 0.80 is an
+     effective value; carry is anchored to real balls separately (fitDrag), so g
+     only sets how strongly an offset turns into backspin or topspin. */
+  const R_BALL_IN = 1.45, R_SUM = 2.7;   // in: ball radius + barrel radius
+  const qOf = bs => 0.23 - 0.0022*Math.max(0, bs - 76.5);
+  /* The slider is release velocity, the number everyone quotes; the collision
+     needs the speed at the plate. 2025 balls in play keep a median 0.917 of
+     release speed at the front of the plate (0.913 for four-seamers). */
+  const PLATE_FRAC = 0.917;
+  const R_BALL_FT = R_BALL_IN/12;
+  /* Direction is fitted to 2025 spray: holding horizontal attack angle fixed,
+     hard-hit balls (top 20 percent by collision efficiency, LA -10 to 50) land
+     at -17.7 + 1.84 x horizontal attack angle + 0.49 x launch angle degrees,
+     negative pull. So a straight path still sends balls pull side, because the
+     barrel at contact faces a little toward pull of its own path: a default face
+     10 deg pull of a straight path puts the model on that line (mean error 0.3 deg). Full
+     sidespin from that angle
+     would then hook every fly ball pull, against the data's drift toward oppo
+     as launch angle rises; K_SIDE keeps the share of the collision's sidespin
+     that restores that drift: 15 percent gives 0.43 deg per degree against 0.49. */
+  const GRIP = 0.80, MU = 0.08, K_SIDE = 0.15;
+  function collide(bp, eff){
+    const yaw = eff.hand*(S.dir - S.face)*Math.PI/180;   // face turned from square-to-path; + is toward pull
+    const T = V.norm(bp.tangent);
+    const bat = V.mul(T, S.bs*1.46667);           // ft/s, the sweet spot's velocity
+    const va = S.pvaa*Math.PI/180, ha = S.phaa*Math.PI/180, pv = S.pv*PLATE_FRAC*1.46667;
+    const pitch = [pv*Math.cos(va)*Math.sin(ha), -pv*Math.cos(va)*Math.cos(ha), pv*Math.sin(va)];
+
+    // Barrel axis, knob to tip, and the squared-up aim square to it.
+    const A = V.norm(rot(V.norm(V.sub(bp.contact, bp.center)), [0,0,1], yaw));
+    const aim = V.norm(rot(T, [0,0,1], yaw));
+    let up = V.norm(V.cross(A, aim));
+    if(up[2] < 0) up = V.mul(up, -1);             // "under the ball" tips the line upward
+    const loc  = Math.asin(Math.max(-1, Math.min(1, eff.off/R_SUM)));
+    const dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const Q = qOf(S.bs);
+
+    // The whole impact for a line of centers tipped by loc. Run once for this
+    // offset and once dead center, so "squared up" is the same physics at zero.
+    function hit(loc){
+    const n = V.norm(V.add(V.mul(aim, Math.cos(loc)), V.mul(up, Math.sin(loc))));
+    const vnOut = (1 + Q)*dot(bat, n) - Q*dot(pitch, n);
+    const pitchT = V.sub(pitch, V.mul(n, dot(pitch, n)));
+    const batT   = V.sub(bat,   V.mul(n, dot(bat, n)));
+    const slip = V.sub(batT, pitchT);             // barrel surface relative to the ball
+    // Friction is capped at MU of the normal impulse: past that the ball slides
+    // across the face. 0.08 leaves every ordinary contact untouched and only binds
+    // on stacked extremes (fast pitch, big offset, path across the pitch line),
+    // which keeps total spin under about 4,600 rpm instead of 7,000+.
+    const jn = vnOut - dot(pitch, n), sl = V.len(slip);
+    const grip = sl > 1e-9 ? Math.min(GRIP, MU*jn/((2/7)*sl)) : GRIP;
+    const outT = V.add(pitchT, V.mul(slip, grip*2/7));
+    // friction acts on the ball at -r*n along the slip: spin = r(-n) x F.
+    // Slip along the barrel's own axis (bat angle off the path, path across the
+    // pitch) is what hooks the ball; K_SIDE keeps that share of the sidespin it
+    // makes, and all of its backspin. The undercut's slice is left whole.
+    const k = -(grip*5/7)/R_BALL_FT, ax = V.mul(A, dot(slip, A));
+    const out = V.add(V.mul(n, vnOut), outT);
+    const d = V.norm(out), r = V.norm(V.cross(d, [0,0,1])), u = V.cross(r, d);
+    const spinAx = V.mul(V.cross(n, ax), k);
+    const spin = V.add(V.mul(V.cross(n, V.sub(slip, ax)), k),
+                       V.sub(spinAx, V.mul(u, (1 - K_SIDE)*dot(spinAx, u))));   // rad/s
+
+    return {n, spin, out};
+    }
+    const {n, spin, out} = hit(loc);
+    // Never harder than any 2025 ball was hit at that launch angle. Stacked
+    // extremes (fastest bat, fastest pitch, steepest path) otherwise reach 125+.
+    const capped = o => { const s = V.len(o), c = evCap(Math.asin(o[2]/(s||1))*180/Math.PI)*1.46667;
+                          return s > c ? V.mul(o, c/s) : o; };
+    const out2 = capped(out);
+    const speed = V.len(out2);
+    const la = Math.asin(out2[2]/(speed||1))*180/Math.PI;
+    const bearing = Math.atan2(out2[0], out2[1]);
+    return {ev: speed/1.46667, la, bearing, dir: V.norm(out2), speed, spin,
+            n, loc, axis: A};
+  }
+
+  /* Flight: gravity, drag and Magnus lift, in the forms and constants of Alan
+     Nathan's trajectory calculator:
+        C_D = CD0 + 0.0292 * spin/1000 rpm      (drag rises with spin)
+        C_L = 1.12 S / (0.583 + 2.333 S),   S = r*spin/v
+     on the total spin, with the lift along (w x v)/|w|. Air at 1.19 kg/m^3,
+     about 75 F near sea level, no wind, spin held constant through the flight.
+     CD0 = 0.37 applies to ground balls only; in the air fitDrag sets the base
+     drag per ball so carry lands on the 2025 median. */
+  const RHO = 1.19;
+  const K_AERO = 0.07182*RHO*0.06261;     // per ft: 0.5*rho*A/m for a 5.125 oz, 9.125 in ball
+  const CD0 = 0.37, CD_SPIN = 0.0292;     // CD0: ground balls only; fitDrag sets it per ball in the air
+
+  /* Ground contact: hops, then a roll. A ball comes off the ground with 0.34
+     of its vertical speed and keeps 0.72 of its horizontal; once it is too slow
+     to hop it rolls, and grass takes it down roughly in proportion to how fast
+     it is still going. Carry is the first touch. The 0.34 is fitted: run 48,446
+     real 2025 batted balls (Coors excluded) through this flight and it gives 324
+     ground-rule doubles against the 360 those balls actually produced, 0.067 per
+     home run as in 2025; at 0.45 it gave over 5,000. It is an effective value for one generic 8 ft wall. */
+  const COR_Z = 0.34, KEEP_XY = 0.72;
+  const ROLL_C = 6, ROLL_K = 0.85, STOP_SPEED = 8, HOP_FLOOR = 3;
+
+  function evCap(la){
+    const i = Math.round(la) - TAB.cap_la0;
+    return TAB.cap[Math.max(0, Math.min(TAB.cap.length - 1, i))];
+  }
+
+  /* Carry answers to real balls. The 2025 median distance for balls hit at this
+     exit velocity and launch angle, interpolated between table cells. Past the
+     table's edges the ball is matched at the edge. */
+  function carryRef(ev, la){
+    const s = TAB.step, G = TAB.carry;
+    const i = Math.max(0, Math.min(G.length - 1.001, (ev - TAB.ev0)/s));
+    const j = Math.max(0, Math.min(G[0].length - 1.001, (la - TAB.la0)/s));
+    const i0 = Math.floor(i), j0 = Math.floor(j), u = i - i0, w = j - j0;
+    return {ev: TAB.ev0 + i*s, la: TAB.la0 + j*s,
+            d: G[i0][j0]*(1-u)*(1-w) + G[i0+1][j0]*u*(1-w) + G[i0][j0+1]*(1-u)*w + G[i0+1][j0+1]*u*w};
+  }
+
+  /* Where the ball first comes down, no walls: what Statcast's hit distance
+     measures. Returns the landing point. */
+  function carryOnly(col, ev, la, cd0){
+    const h = Math.hypot(col.dir[0], col.dir[1]) || 1, r = la*Math.PI/180, sp = ev*1.46667;
+    let v = [col.dir[0]/h*Math.cos(r)*sp, col.dir[1]/h*Math.cos(r)*sp, Math.sin(r)*sp];
+    let p = [0, 17/12 + 1, 2.5];
+    const dt = 1/240;
+    for(let i=0;i<240*12;i++){
+      const k1 = aero(v, col.spin, cd0), k2 = aero(V.add(v, V.mul(k1, dt/2)), col.spin, cd0);
+      const k3 = aero(V.add(v, V.mul(k2, dt/2)), col.spin, cd0), k4 = aero(V.add(v, V.mul(k3, dt)), col.spin, cd0);
+      const vn = V.add(v, V.mul(V.add(V.add(k1, V.mul(k2, 2)), V.add(V.mul(k3, 2), k4)), dt/6));
+      const q = V.add(p, V.mul(V.add(v, vn), dt/2));
+      if(q[2] <= 0){ const f = p[2]/(p[2] - q[2]); return [p[0] + (q[0]-p[0])*f, p[1] + (q[1]-p[1])*f]; }
+      p = q; v = vn;
+    }
+    return [p[0], p[1]];
+  }
+
+  /* Balls toward the lines carry less than balls up the middle at the same exit
+     velocity and launch angle: in 2025 a pulled liner down the line went 12
+     percent short of its cell's median and an oppo fly ball 5 to 8 percent.
+     SPRAY[band][bin] is the median of distance over its EV/LA cell median for
+     40,900 air balls of 85+ mph (Coors out), by launch angle band (centred 15,
+     25, 40 deg) and landing direction (10 deg bins from -45, pull, to +45). */
+  const SPRAY = [[0.875,0.906,0.964,1.017,1.043,1.055,1.036,1.015,0.991,0.979],
+                 [0.948,0.981,1.013,1.030,1.030,1.023,1.000,0.973,0.944,0.924],
+                 [1.003,1.016,1.022,1.018,1.012,1.003,0.991,0.978,0.968,0.966]];
+  function sprayFactor(la, spray){
+    const x = Math.max(0, Math.min(8.999, (spray + 45)/10)), i = Math.floor(x), u = x - i;
+    const row = b => SPRAY[b][i] + (SPRAY[b][i+1] - SPRAY[b][i])*u;
+    const L = Math.max(15, Math.min(40, la));
+    return L <= 25 ? row(0) + (row(1) - row(0))*(L - 15)/10 : row(1) + (row(2) - row(1))*(L - 25)/15;
+  }
+
+  /* The base drag that lands this ball on the 2025 median. Carry falls as drag
+     rises, so bisect; bounded so no ball flies on implausible air. Ground balls
+     keep the base drag: their Statcast distance is where they were fielded, not
+     where they landed. From 4 to 10 deg the drag blends from that into the drag
+     fitted at 10 deg, so carry does not jump where the table starts. */
+  function fitDrag(col){
+    if(col.la < 4) return CD0;
+    const ref = carryRef(col.ev, Math.max(10, col.la));
+    const land = carryOnly(col, ref.ev, ref.la, 0.35);
+    const target = ref.d*sprayFactor(ref.la, Math.atan2(land[0], land[1])*180/Math.PI*(HAND === "L" ? -1 : 1));
+    let lo = 0.10, hi = 1.00;
+    for(let k=0;k<16;k++){
+      const mid = (lo + hi)/2;
+      const q = carryOnly(col, ref.ev, ref.la, mid);
+      if(Math.hypot(q[0], q[1]) > target) lo = mid; else hi = mid;
+    }
+    const fit = (lo + hi)/2;
+    return col.la >= 10 ? fit : CD0 + (fit - CD0)*(col.la - 4)/6;
+  }
+
+  function aero(v, w, cd0){
+    const sp = V.len(v) || 1e-6;
+    const cr = V.cross(w, v), cl = V.len(cr);
+    const wt = V.len(w);                                  // total spin, rad/s
+    const cd = cd0 + CD_SPIN*(wt*60/(2*Math.PI))/1000;
+    const a = V.mul(v, -K_AERO*cd*sp);
+    if(cl > 1e-9){
+      const s = R_BALL_FT*wt/sp;
+      const m = K_AERO*(1.12*s/(0.583 + 2.333*s))*sp/wt;
+      a[0] += cr[0]*m; a[1] += cr[1]*m; a[2] += cr[2]*m;
+    }
+    a[2] -= G_FT;
+    return a;
+  }
+
+  function flight(bp, col, cd0){
+    const c = bp.contact;
+    let p = [c[0], c[1], c[2]];
+    let v = V.mul(col.dir, col.speed);
+    const w = col.spin;
+    // RK4 at 240 Hz, sampled into the path at 60
+    const dt = 1/240, SUB = 4;
+    const pts = [p.slice()];
+    let carry = null, landIdx = 0, rolling = false, hang = null;
+    let wallDone = false, cleared = false, wallHit = false, landBear = null, overOnHop = false;
+    /* Off any wall the ball reaches from inside the park below its top -- the
+       fence, the foul-side walls, the backstop -- it rebounds off the wall's own
+       angle: padding returns about a third of the speed into it and the ball keeps
+       most of its run along it. A ball already over the wall is in the seats. */
+    const inPark = q => Math.hypot(q[0], q[1]) < bound(Math.atan2(q[0], q[1]));
+    function bounce(prev){
+      if(!inPark(prev) || inPark(p)) return false;
+      if(p[2] > WALL_H){                             // over it: on a hop, fair, that is a ground-rule double
+        if(carry !== null && Math.abs(Math.atan2(p[0], p[1])) <= FOUL) overOnHop = true;
+        return false;
+      }
+      const b = Math.atan2(p[0], p[1]), R = bound(b), e = 1e-3;
+      const t = V.norm([Math.sin(b+e)*bound(b+e) - Math.sin(b-e)*bound(b-e),
+                        Math.cos(b+e)*bound(b+e) - Math.cos(b-e)*bound(b-e), 0]);
+      let n = [-t[1], t[0], 0];
+      if(n[0]*p[0] + n[1]*p[1] > 0) n = V.mul(n, -1);          // into the park
+      const vn = v[0]*n[0] + v[1]*n[1], vt = v[0]*t[0] + v[1]*t[1];
+      const k = (R - 0.2)/Math.hypot(p[0], p[1]);
+      p = [p[0]*k, p[1]*k, p[2]];
+      v = [-vn*0.35*n[0] + vt*0.8*t[0], -vn*0.35*n[1] + vt*0.8*t[1], v[2]];
+      return true;
+    }
+    for(let i=1;i<=240*12;i++){
+      if(rolling){
+        const hs = Math.hypot(v[0], v[1]);
+        if(hs <= STOP_SPEED) break;
+        const dec = Math.min(hs, (ROLL_C + ROLL_K*hs)*dt);
+        v = [v[0] - v[0]/hs*dec, v[1] - v[1]/hs*dec, 0];
+        const q = p;
+        p = [p[0] + v[0]*dt, p[1] + v[1]*dt, 0];
+        if(bounce(q)) pts.push(p.slice());
+        else if(i % SUB === 0) pts.push(p.slice());
+        continue;
+      }
+      const k1 = aero(v, w, cd0), v2 = V.add(v, V.mul(k1, dt/2));
+      const k2 = aero(v2, w, cd0), v3 = V.add(v, V.mul(k2, dt/2));
+      const k3 = aero(v3, w, cd0), v4 = V.add(v, V.mul(k3, dt));
+      const k4 = aero(v4, w, cd0);
+      const q = p;
+      p = V.add(p, V.mul(V.add(V.add(v, V.mul(v2, 2)), V.add(V.mul(v3, 2), v4)), dt/6));
+      v = V.add(v, V.mul(V.add(V.add(k1, V.mul(k2, 2)), V.add(V.mul(k3, 2), k4)), dt/6));
+      if(p[2] <= 0){
+        const f = q[2]/((q[2] - p[2]) || 1);
+        p = [q[0]+(p[0]-q[0])*f, q[1]+(p[1]-q[1])*f, 0];
+        bounce(q);                                   // came down at the foot of the wall
+        pts.push(p.slice());
+        const outside = !inPark(p);                  // came down in the seats or beyond: it stays there
+        if(carry === null){
+          carry = Math.hypot(p[0], p[1]);           // from home plate, as distance is quoted
+          landIdx = pts.length - 1;
+          hang = (i - 1 + f)*dt;
+          landBear = Math.atan2(p[0], p[1]);
+        }
+        if(outside) break;
+        v = [v[0]*KEEP_XY, v[1]*KEEP_XY, -v[2]*COR_Z];
+        if(v[2] < HOP_FLOOR) rolling = true;
+        continue;
+      }
+      /* The fence on the fly, met where the ball actually reaches it, in fair
+         territory: over it is a home run; into it is off the wall, and that first
+         touch is the carry. */
+      if(!wallDone && carry === null){
+        const r = Math.hypot(p[0], p[1]), b = Math.atan2(p[0], p[1]);
+        if(Math.abs(b) <= FOUL && r >= fenceAt(b)){
+          wallDone = true;
+          if(p[2] > WALL_H) cleared = true;
+        }
+      }
+      if(bounce(q)){
+        pts.push(p.slice());
+        if(carry === null){                          // first touch is the wall
+          const b = Math.atan2(p[0], p[1]);
+          carry = bound(b); landIdx = pts.length - 1; hang = i*dt; landBear = b;
+          wallHit = Math.abs(b) <= FOUL;             // a foul-side wall is still a foul
+        }
+        continue;
+      }
+      if(i % SUB === 0) pts.push(p.slice());
+    }
+    if(carry === null){ carry = Math.hypot(p[0], p[1]); landIdx = pts.length - 1; landBear = Math.atan2(p[0], p[1]); }
+    return {pts: pts.map(q => [q[0], q[1], Math.max(0.06, q[2])]), carry, landIdx, hang,
+            cleared, wallHit, landBear, overOnHop};
+  }
+
+  /* ---------------- percentiles against 2025 ---------------- */
+  function pctOf(key, v){
+    const d = DATA.distributions[key];
+    if(!d) return null;
+    let below = 0, total = 0;
+    for(let i=0;i<d.counts.length;i++){
+      const c = d.counts[i], mid = d.lo + d.width*(i+0.5);
+      total += c;
+      if(mid < v) below += c; else if(Math.abs(mid-v) < d.width/2) below += c*0.5;
+    }
+    return total ? Math.round(100*below/total) : null;
+  }
+
+
+  /* Wall distances: 330 down the lines, about 375 in the alleys, 400 to centre.
+     The physics uses this, so it stays fair territory only. */
+  function fenceAt(bearRad){
+    const a = Math.min(1, Math.abs(bearRad)/(Math.PI/4));
+    return 400 - 70*Math.pow(a, 1.35);
+  }
+  /* The drawn boundary closes all the way round to the backstop. It has to: the
+     default camera sits in front of the plate looking BACK at the hitter, so a
+     park that only exists in fair territory leaves that view staring into the
+     void. Past each pole a straight wall runs in to meet a 60 ft backstop arc
+     where it is tangent to it, the way a real park's foul-side walls do: about
+     44 ft of foul ground at the bases, none at the poles, and no dimple behind
+     the plate. Drawing only. */
+  const FOUL = Math.PI/4, EDGE = 62*Math.PI/180, WALL_H = 8;
+  const BACK_R = 60, B_TAN = FOUL + Math.acos(BACK_R/fenceAt(FOUL));
+  const absBear = b => Math.abs(((b + Math.PI) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI) - Math.PI);
+  function bound(b){
+    const ab = absBear(b);
+    if(ab <= FOUL) return fenceAt(ab);
+    if(ab < B_TAN) return BACK_R/Math.cos(ab - B_TAN);   // the straight foul-side wall
+    return BACK_R;
+  }
+  /* Grass ends at the warning track, a constant 15 ft inside every wall. */
+  const TRACK_W = 15;
+  function trackIn(b){
+    const ab = absBear(b);
+    if(ab <= FOUL) return fenceAt(ab) - TRACK_W;
+    if(ab < B_TAN) return bound(b) - TRACK_W/Math.cos(ab - B_TAN);
+    return BACK_R - TRACK_W;
+  }
+
+  /* =================== the park ===================
+     Real dimensions: 90 ft bases, rubber 60.5 ft, mound 18 ft across, the
+     skinned infield on its 95 ft arc from the rubber, 13 ft home and base
+     cutouts, 6 ft base paths -- which is why the infield grass is inset 3 ft.
+
+     Drawn as ground GROUPS rather than one mesh with one material per cell: a
+     polar mesh cannot resolve the straight edges of the grass diamond without
+     absurd resolution, and stacking exact polygons on a depth sort tears,
+     because coplanar layers differ by an inch of lift and lose to a foot of
+     horizontal position by about a hundred to one. Groups order the stack, so
+     each region can be its true shape.
+
+     A ballpark under lights: striped green turf, tan clay, white chalk. The
+     stands sit darker than the field so the field, the ball and the labels
+     carry the eye. */
+  const TURF_A = "#2D7A32", TURF_B = "#37883B", TURF_IN = "#33823A";
+  const CLAY = "#A9744B", CLAY_M = "#B47F55", TRACK = "#946646";
+  /* A night game on TV: charcoal padding with a yellow home-run line and yellow
+     poles, a neutral concrete-and-seat bowl that sits darker than the field so
+     the grass, the dirt and the ball carry the eye, and one ribbon board. */
+  const PAD = "#1D2125", EYE = ["#122019", "#15241C"], POLE = "#E8B92F", CAP = "#4A4F57";
+  /* A full house: each run of seats takes one of a few close, muted crowd
+     tones, a shade lighter on even rows and darker on odd, so the rows read
+     as rows and the crowd as texture rather than a patchwork. */
+  const CROWD = [["#3F3638", "#3A3A41", "#433A35", "#3C3739", "#41393B"],
+                 ["#302A2C", "#2C2D33", "#342D29", "#2F2B2C", "#332C2E"]];
+  const CONC = "#4A4945", FACADE = "#131518", RIBBON = "#2F6E9C", FASCIA = "#454A52";
+  const NET_FROM = 128*Math.PI/180;        // backstop net: the arc behind the plate, dugout to dugout
+  const CHALK = "#E8E8E8";
+
+  const G_TURF = 0, G_SKIN = 1, G_GRASS = 2, G_CUT = 3, G_PAINT = 4;
+
+  const B90 = 90/Math.SQRT2;              // base x/y coordinate, 63.64 ft
+  const ARC_Y = 60.5, ARC_R = 95, MOUND_Y = 59, MOUND_R = 9;
+  const INSET = 3*Math.SQRT2;             // 3 ft of perpendicular, in diamond units
+  const BASES = [[B90, B90], [0, 2*B90], [-B90, B90]];
+
+  // Radius at which a ray from home crosses the 95 ft arc centred on the rubber.
+  function arcR(b){
+    const k = ARC_Y*Math.cos(b);
+    return k + Math.sqrt(Math.max(0, k*k - ARC_Y*ARC_Y + ARC_R*ARC_R));
+  }
+  // Where a ray from home enters and leaves the inset grass diamond: in across the
+  // home-side edges, y - |x| = INSET, and out across the far ones, y + |x| = 2*B90 - INSET.
+  // (The near edge once used B90 - INSET, which started the grass behind the mound.)
+  function grassIn(b){  return INSET/(Math.cos(b) - Math.abs(Math.sin(b))); }
+  function grassOut(b){ return (2*B90 - INSET)/(Math.cos(b) + Math.abs(Math.sin(b))); }
+
+  function bearsOf(from, to, n){
+    const a = [];
+    for(let i=0;i<=n;i++) a.push(from + (to-from)*i/n);
+    return a;
+  }
+  /* One bearing list for the ground and the wall so their edges cannot disagree:
+     dense across fair territory, coarser round the back where it is all close in
+     and there is nothing to resolve. */
+  const BEARS = bearsOf(-EDGE, -FOUL, 5)
+                  .concat(bearsOf(-FOUL, FOUL, 40).slice(1),       // a vertex on each pole, so the corner is sharp
+                          bearsOf(FOUL, EDGE, 5).slice(1),
+                          bearsOf(EDGE, 2*Math.PI - EDGE, 40).slice(1));
+  const FAIR = bearsOf(-FOUL, FOUL, 44);
+
+  function fan(bears, r0fn, r1fn, nr, matfn, g){
+    for(let i=0;i<bears.length-1;i++){
+      const b0 = bears[i], b1 = bears[i+1];
+      const s0 = Math.sin(b0), c0 = Math.cos(b0), s1 = Math.sin(b1), c1 = Math.cos(b1);
+      const a0 = r0fn(b0), a1 = r0fn(b1), z0 = r1fn(b0), z1 = r1fn(b1);
+      if(!(a0 < z0) || !(a1 < z1)) continue;             // ray misses the region
+      for(let j=0;j<nr;j++){
+        const f0 = j/nr, f1 = (j+1)/nr;
+        const p0 = a0 + (z0-a0)*f0, p1 = a1 + (z1-a1)*f0;
+        const q0 = a0 + (z0-a0)*f1, q1 = a1 + (z1-a1)*f1;
+        const mat = matfn(i, j, (b0+b1)/2, (p0+q0)/2);
+        if(!mat) continue;
+        // Stroked in its own colour: adjacent fills leave hairline seams
+        // otherwise, and a seam on a ground plane reads as a crack.
+        st.poly([[s0*p0, c0*p0, 0], [s1*p1, c1*p1, 0],
+                 [s1*q1, c1*q1, 0], [s0*q0, c0*q0, 0]], mat, mat, 1, g);
+      }
+    }
+  }
+  /* A disc as an annular mesh rather than one polygon: the renderer drops any
+     polygon with a single vertex behind the camera, and near the plate the
+     camera lives inside these. */
+  function disc(cx, cy, r, mat, g){
+    const NA = 24, NR = 2;
+    for(let i=0;i<NA;i++){
+      const a0 = 2*Math.PI*i/NA, a1 = 2*Math.PI*(i+1)/NA;
+      for(let j=0;j<NR;j++){
+        const u = r*j/NR, w = r*(j+1)/NR;
+        st.poly([[cx+Math.cos(a0)*u, cy+Math.sin(a0)*u, 0],
+                 [cx+Math.cos(a1)*u, cy+Math.sin(a1)*u, 0],
+                 [cx+Math.cos(a1)*w, cy+Math.sin(a1)*w, 0],
+                 [cx+Math.cos(a0)*w, cy+Math.sin(a0)*w, 0]], mat, mat, 1, g);
+      }
+    }
+  }
+
+  /* Bases are 15 in of white canvas, not the foot and a half of grey they were. */
+  /* Bases: 18 in canvas squares with their sides along the base lines. First and
+     third sit wholly in fair territory with a corner on the base point; second
+     is centred on its point. Edged in grey so they hold against the dirt. */
+  function base(dist, bear, centred){
+    const c = [Math.sin(bear)*dist, Math.cos(bear)*dist], s = 1.5;
+    const u = [-Math.SQRT1_2, -Math.SQRT1_2], v = [-Math.SQRT1_2, Math.SQRT1_2];
+    if(bear < 0){ u[0] = -u[0]; v[0] = -v[0]; }              // third base mirrors first
+    const o = centred ? -s/2 : 0;
+    const at = (a, b) => [c[0] + u[0]*a + v[0]*b, c[1] + u[1]*a + v[1]*b, 0.02];
+    st.poly([at(o, o), at(o + s, o), at(o + s, o + s), at(o, o + s)], CHALK, C.muted, 1, G_PAINT);
+  }
+  /* Chalk as a painted strip rather than a hairline, so it survives distance.
+     Cut into pieces because a long thin quad is one all-or-nothing polygon. */
+  function chalk(from, to, wide, color, g){
+    const d = V.norm([to[0]-from[0], to[1]-from[1], 0]);
+    const n = [-d[1]*wide/2, d[0]*wide/2, 0];
+    const N = 14;
+    for(let i=0;i<N;i++){
+      const u = i/N, w = (i+1)/N;
+      const a = [from[0]+(to[0]-from[0])*u, from[1]+(to[1]-from[1])*u];
+      const b = [from[0]+(to[0]-from[0])*w, from[1]+(to[1]-from[1])*w];
+      st.poly([[a[0]+n[0],a[1]+n[1],0.02], [b[0]+n[0],b[1]+n[1],0.02],
+               [b[0]-n[0],b[1]-n[1],0.02], [a[0]-n[0],a[1]-n[1],0.02]],
+              color || CHALK, color || CHALK, 1, g == null ? G_PAINT : g);
+    }
+  }
+
+  /* The wall the whole way round, its home-run line, the net behind the plate,
+     the seating bowl, the batter's eye and the light towers. Drawing only: the
+     ball plays off fenceAt and WALL_H. */
+  function drawWall(st){
+    // One-sided: walls and stands face the field, so from outside the park the
+    // camera sees in rather than staring at the back of the stands.
+    const face1 = (pts, col) => st.poly(pts, col, col, 1, undefined, true);
+    for(let i=0;i<BEARS.length-1;i++){
+      const b0 = BEARS[i], b1 = BEARS[i+1];
+      const r0 = bound(b0), r1 = bound(b1);
+      const bm = (b0 + b1)/2, fair = Math.abs(bm) <= FOUL + 0.02;
+      // Both ends of this slice, k ft back from the wall and z ft up.
+      const at = (k, z) => [[Math.sin(b0)*(r0+k), Math.cos(b0)*(r0+k), z],
+                            [Math.sin(b1)*(r1+k), Math.cos(b1)*(r1+k), z]];
+      const band = (p, q, col) => face1([p[0], p[1], q[1], q[0]], col);
+      const edge = (p, col, w, a) => st.line(p[0], p[1], col, w, a);
+
+      /* Everything is a solid band, never a line laid on a band: the painter's
+         sort puts a line behind its own band about half the time, which is
+         what broke rows and the ribbon board into dashes. */
+      const top = at(0, WALL_H);
+      band(at(0, 0), at(0, WALL_H - 0.7), PAD);
+      // The yellow line marks a home run, so it runs only where one is possible.
+      band(at(0, WALL_H - 0.7), top, fair ? POLE : CAP);
+
+      /* The batter's eye: the lower bowl in straightaway center is a dark,
+         tarped section, as many parks do it, so the bowl stays one shape. */
+      const eye = Math.abs(bm) < 0.16;
+      // Behind the plate a net rises from the padding on poles.
+      if(absBear(bm) > NET_FROM){
+        const n = at(0, 34);
+        st.poly([top[0], top[1], n[1], n[0]], "#D1D5DB", null, .05);
+        for(const z of [16, 25]) edge(at(0, z), "#D1D5DB", .8, .14);
+        edge(n, "#D1D5DB", 1.1, .5);
+        if(i % 3 === 0) st.line(top[0], n[0], "#6B7280", 1.6, .85);
+      }
+      // Rows as alternating strips, from p to q: [k, z] at each end.
+      const rows = (p, q, n, cols) => { for(let j=0;j<n;j++){ const u = j/n, w = (j+1)/n;
+        band(at(p[0] + (q[0]-p[0])*u, p[1] + (q[1]-p[1])*u),
+             at(p[0] + (q[0]-p[0])*w, p[1] + (q[1]-p[1])*w), cols(j)); } };
+      // Fixed per seat run (not random per frame), so the crowd holds still.
+      const crowd = t => j => CROWD[j % 2][(i*7 + j*3 + t*5 + ((i*j) % 4)) % 5];
+      // Lower bowl, concourse, the upper deck's front with its ribbon board,
+      // the upper deck, and the roof edge.
+      rows([0, WALL_H], [40, 30], 6, eye ? (j => EYE[j % 2]) : crowd(0));
+      band(at(40, 30), at(48, 30), CONC);
+      band(at(48, 30), at(48, 34.6), FACADE);
+      band(at(48, 34.6), at(48, 35.8), RIBBON);
+      band(at(48, 35.8), at(48, 40), FACADE);
+      rows([48, 40], [100, 78], 7, crowd(1));
+      band(at(100, 78), at(100, 85), FASCIA);
+    }
+    // Light towers on the outfield roof, banks facing the plate. None round the infield:
+    // the camera backs out that way on long balls and one would loom over it.
+    for(const deg of [-72, -36, 36, 72]){
+      const b = deg*Math.PI/180, r = bound(b) + 100;
+      const base = [Math.sin(b)*r, Math.cos(b)*r], side = [Math.cos(b), -Math.sin(b)];
+      st.line([base[0], base[1], 85], [base[0], base[1], 104], "#5A5F66", 2, .9);
+      const p = (u, z) => [base[0] + side[0]*u, base[1] + side[1]*u, z];
+      // One-sided like the stands, so a camera backed out past them never sees a bank from behind.
+      st.poly([p(-14, 102), p(14, 102), p(14, 113), p(-14, 113)], "#FFF6E0", "#C9CDD3", .95, undefined, true);
+    }
+  }
+
+  function drawField3D(st, hand){
+    /* g0 turf: mown in straight 24 ft stripes square to the line from the plate
+       to center field, as a grounds crew cuts it, then the warning track. A
+       stripe edge is a line of constant y, so along a ray it sits at k*MOW/cos.
+       Foul ground well off the lines, where that runs away, is left plain. */
+    const MOW = 24;
+    for(let i=0;i<BEARS.length-1;i++){
+      const b0 = BEARS[i], b1 = BEARS[i+1], e0 = trackIn(b0), e1 = trackIn(b1);
+      const s0 = Math.sin(b0), c0 = Math.cos(b0), s1 = Math.sin(b1), c1 = Math.cos(b1);
+      const quad = (u0, u1, w0, w1, mat) =>
+        st.poly([[s0*u0, c0*u0, 0], [s1*u1, c1*u1, 0], [s1*w1, c1*w1, 0], [s0*w0, c0*w0, 0]], mat, mat, 1, G_TURF);
+      if(Math.min(c0, c1) > 0.3){
+        for(let k=0; k*MOW/c0 < e0 || k*MOW/c1 < e1; k++){
+          const u0 = Math.min(k*MOW/c0, e0), u1 = Math.min(k*MOW/c1, e1);
+          const w0 = Math.min((k+1)*MOW/c0, e0), w1 = Math.min((k+1)*MOW/c1, e1);
+          if(w0 - u0 + w1 - u1 > 0.01) quad(u0, u1, w0, w1, k % 2 ? TURF_A : TURF_B);
+        }
+      } else quad(0, 0, e0, e1, TURF_A);
+      quad(e0, e1, bound(b0), bound(b1), TRACK);
+    }
+
+    /* Outside the wall: near-black, so it reads as nothing, but a ball that
+       clears the park lands on a surface rather than hanging in the void. */
+    fan(BEARS, bound, b => bound(b) + 240, 3, () => "#0B0B0B", G_TURF);
+
+    /* g1 the skinned infield, out to its real arc, clipped to the foul lines. */
+    fan(FAIR, () => 0, arcR, 4, () => CLAY, G_SKIN);
+
+    /* g2 the infield grass, inset 3 ft from the base lines, which is what leaves
+       the base paths as dirt. Straight edges, because it is drawn as its shape. */
+    fan(FAIR, grassIn, grassOut, 4, () => TURF_IN, G_GRASS);
+
+    /* g3 the cutouts that eat back into that grass, and the mound. */
+    disc(0, 0, 13, CLAY, G_CUT);
+    for(const p of BASES) disc(p[0], p[1], 13, CLAY, G_CUT);
+    disc(0, MOUND_Y, MOUND_R, CLAY_M, G_CUT);
+    /* The base paths, a full 6 ft of dirt centred on each line from the plate
+       circle to the bag. The infield grass only ever supplied the fair half, so
+       the foul half read as grass and the path looked half its width. */
+    for(const sgn of [-1, 1]){
+      const d = [sgn*Math.SQRT1_2, Math.SQRT1_2];
+      chalk([d[0]*12, d[1]*12], [d[0]*84, d[1]*84], 6, CLAY, G_CUT);
+    }
+    // The running lane up the first-base line: 3 ft wide, the back half of the way, foul side.
+    {
+      const d = [Math.SQRT1_2, Math.SQRT1_2], f = [Math.SQRT1_2*3, -Math.SQRT1_2*3];
+      chalk([d[0]*45 + f[0], d[1]*45 + f[1]], [d[0]*90 + f[0], d[1]*90 + f[1]], 3/12);
+      chalk([d[0]*45 + f[0], d[1]*45 + f[1]], [d[0]*45, d[1]*45], 3/12);
+    }
+
+    drawWall(st);
+
+    // Foul lines, painted out to the poles, and the poles themselves.
+    for(const sgn of [-1, 1]){
+      const b = sgn*FOUL, r = fenceAt(b);
+      const tip = [Math.sin(b)*r, Math.cos(b)*r];
+      // Chalked from past the batter's box, as a real line is: drawn from the
+      // plate it ran through the box as a white bar in front of the zone.
+      chalk([Math.sin(b)*8, Math.cos(b)*8], tip, 4/12);
+      st.line([tip[0],tip[1],0], [tip[0],tip[1],40], POLE, 2.4, .95);
+      st.poly([[tip[0],tip[1],WALL_H], [tip[0],tip[1],40],
+               [tip[0]-sgn*2.2, tip[1]-2.2, 40], [tip[0]-sgn*2.2, tip[1]-2.2, WALL_H]],
+              null, POLE, .3);
+      st.label([Math.sin(b)*(r-8), Math.cos(b)*(r-8), 5.2],
+               (sgn*hand < 0 ? "PULL " : "OPPO ") + Math.round(r), C.dist, 0, 9);
+    }
+    // Wall numbers where a park paints them: the alleys and dead centre.
+    for(const b of [-0.42, 0, 0.42]){
+      const r = fenceAt(b);
+      st.label([Math.sin(b)*(r-8), Math.cos(b)*(r-8), 5.2],
+               Math.round(r) + "", C.dist, 0, 9.5);
+    }
+
+    // g4 the paint: bags, rubber, and the lines already drawn above.
+    base(90, FOUL); base(127.28, 0, true); base(90, -FOUL);
+    st.poly([[-1, 60.25, 0.02], [1, 60.25, 0.02], [1, 60.75, 0.02], [-1, 60.75, 0.02]],
+            CHALK, CHALK, 1, G_PAINT);
+  }
+
+  let homeDist = null, lastSet = null;      // home values follow the viewer's own zoom
+  let homePitch = null, lastPitch = null;   // and their own orbit
+  let tr = null;
+  let lastDrag = {key: "", cd0: CD0};
+  /* The swing is over in a blink and the flight takes four seconds, so the raw
+     geometry would spend most of the timeline on the barrel. Give the swing the
+     first 40 per cent of the scrub and the ball the rest. */
+  const SWING_SHARE = 0.40;
+  /* Barrel on ball, seen straight down the barrel's long axis with the pitcher
+     to the right. The barrel at contact is tilted (tip below the hands), so this
+     view plane is tilted with it -- it is the plane the offset actually lives
+     in. Every direction drawn (barrel path, line of centers, pitch, launch) is
+     projected into it, "up" being as close to true up as the plane allows. The
+     offset is the perpendicular distance from the barrel path to the ball's
+     center, the same eff.off the collision uses. Redrawn only on input changes. */
+  const R_BARREL = R_SUM - 1.45;   // in; 1.45 in is the ball's radius
+  let ballKey = "";
+  function drawBallView(eff, col, bp){
+    const key = [eff.off, eff.aa, col.la, S.pvaa, HAND, ...col.spin].map(v => v.toFixed ? v.toFixed(3) : v).join("|");
+    if(key === ballKey) return;
+    ballKey = key;
+    const K = 26, cx = 70;                           // px per inch, barrel centre
+    const A = col.axis, dt = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const yv = V.norm(V.sub([0,0,1], V.mul(A, A[2])));
+    let xv = V.cross(yv, A); if(dt(xv, bp.tangent) < 0) xv = V.mul(xv, -1);
+    const ang = w => Math.atan2(dt(w, yv), dt(w, xv));
+    const tn = ang(col.n);                            // line of centers
+    const tv = tn - col.loc;                          // barrel path, in this view
+    // keep the pair centred vertically however far the ball rides up or down
+    const cy = 90 + R_SUM*Math.sin(tn)*K/2;
+    const P = (x, y) => (cx + x*K).toFixed(1) + "," + (cy - y*K).toFixed(1);
+    const bx = R_SUM*Math.cos(tn), by = R_SUM*Math.sin(tn);   // ball centre, in
+    const fx = R_SUM*Math.cos(col.loc)*Math.cos(tv), fy = R_SUM*Math.cos(col.loc)*Math.sin(tv);
+    const ux = Math.cos(tv), uy = Math.sin(tv);
+    const la = ang(col.dir);                          // launch, as seen in this view
+    const pva = S.pvaa*Math.PI/180, pha = S.phaa*Math.PI/180;
+    const pw = [Math.cos(pva)*Math.sin(pha), -Math.cos(pva)*Math.cos(pha), Math.sin(pva)];
+    const rb = 1.45*K, rw = R_BARREL*K;
+
+    // Backspin in the flight frame: about the horizontal axis square to the
+    // ball's heading, + for a ball heading out. The heading is taken the way the
+    // barrel travels, or a foul that leaves backward flips the sign of the same spin.
+    let hd = V.norm([col.dir[0], col.dir[1], 0]);
+    if(dt(hd, bp.tangent) < 0) hd = V.mul(hd, -1);
+    const right = V.cross(hd, [0,0,1]);
+    const rpm = (col.spin[0]*right[0] + col.spin[1]*right[1] + col.spin[2]*right[2])*60/(2*Math.PI);
+    /* The rest of the spin vector, in the ball's own frame. Sidespin is about the
+       axis perpendicular to both the flight and the barrel-parallel axis; with
+       Magnus along spin x velocity, positive sidespin curves the ball toward -x,
+       which is the pull side for a righty. Gyro, about the flight direction,
+       is zero by construction here: one friction impulse gives spin
+       perpendicular to both the line of centres and the slip, and the ball
+       leaves in the plane of those two. */
+    const dv = col.dir, up = V.norm(V.cross(V.cross([dv[0], dv[1], 0], [0,0,1]), dv));
+    const side = (col.spin[0]*up[0] + col.spin[1]*up[1] + col.spin[2]*up[2])*60/(2*Math.PI);
+    /* Spin is computed so the flight bends the right way, but no public data
+       measures batted-ball sidespin, so the page describes the flight in words
+       rather than quoting rpm. */
+    const kind = col.la < 10 ? "Ground ball" : col.la < 25 ? "Line drive" : col.la < 50 ? "Fly ball" : "Pop-up";
+    const lift = rpm > 1500 ? "Heavy backspin, carries" : rpm > 300 ? "Backspin, holds up"
+               : rpm > -300 ? "Little spin, flat" : "Topspin, dives";
+    const pull = side*eff.hand > 0;
+    const curve = Math.abs(side) < 300 ? "Stays on line"
+                : (Math.abs(side) < 1200 ? "Slight " : "") + (pull ? "hook to pull side" : "slice to oppo side");
+
+    const arrow = (x0, y0, x1, y1, color, w, dash) => {
+      const a = Math.atan2(y1 - y0, x1 - x0), h = 6;
+      return '<line x1="'+x0.toFixed(1)+'" y1="'+y0.toFixed(1)+'" x2="'+x1.toFixed(1)+'" y2="'+y1.toFixed(1)+
+             '" stroke="'+color+'" stroke-width="'+w+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>' +
+             '<path d="M'+x1.toFixed(1)+','+y1.toFixed(1)+' L'+(x1-h*Math.cos(a-0.45)).toFixed(1)+','+(y1-h*Math.sin(a-0.45)).toFixed(1)+
+             ' L'+(x1-h*Math.cos(a+0.45)).toFixed(1)+','+(y1-h*Math.sin(a+0.45)).toFixed(1)+' Z" fill="'+color+'"/>';
+    };
+    const sx = cx + bx*K, sy = cy - by*K;            // ball centre, px
+    let g = "";
+    // horizon for reference, then the barrel path through the barrel's centre
+    g += '<line x1="6" y1="'+cy+'" x2="234" y2="'+cy+'" stroke="'+C.grid+'" stroke-width="1"/>';
+    g += arrow(cx - 62*ux, cy + 62*uy, cx + 160*ux, cy - 160*uy, C.accent, 1.2, "4 3");
+    g += '<text x="6" y="158" fill="'+C.accent+'">BARREL PATH, TIP '+fmt(-Math.asin(A[2])*180/Math.PI,0)+'&deg; DOWN</text>';
+    // the pitch, arriving from the right at its descent angle
+    const pl = Math.hypot(dt(pw, xv), dt(pw, yv)) || 1;
+    const pd = [dt(pw, xv)/pl, dt(pw, yv)/pl];        // pitch direction in the view, y up
+    const pe = [sx - pd[0]*(rb + 3), sy + pd[1]*(rb + 3)];
+    g += arrow(pe[0] - pd[0]*40, pe[1] + pd[1]*40, pe[0], pe[1], C.white, 1.1, "2 3");
+    // barrel end grain
+    g += '<circle cx="'+cx+'" cy="'+cy+'" r="'+rw+'" fill="'+WOOD[1]+'" stroke="'+WOOD[3]+'" stroke-width="1.2"/>';
+    g += '<circle cx="'+cx+'" cy="'+cy+'" r="'+(rw*0.62).toFixed(1)+'" fill="none" stroke="'+WOOD[2]+'" stroke-width=".8"/>';
+    g += '<circle cx="'+cx+'" cy="'+cy+'" r="'+(rw*0.28).toFixed(1)+'" fill="none" stroke="'+WOOD[2]+'" stroke-width=".8"/>';
+    // the ball, with a hint of seam
+    g += '<circle cx="'+sx.toFixed(1)+'" cy="'+sy.toFixed(1)+'" r="'+rb+'" fill="'+C.athens+'" stroke="'+C.foot+'" stroke-width="1"/>';
+    g += '<path d="M'+(sx-rb*0.55).toFixed(1)+','+(sy-rb*0.8).toFixed(1)+' Q'+(sx-rb*0.05).toFixed(1)+','+sy.toFixed(1)+' '+(sx-rb*0.55).toFixed(1)+','+(sy+rb*0.8).toFixed(1)+
+         ' M'+(sx+rb*0.55).toFixed(1)+','+(sy-rb*0.8).toFixed(1)+' Q'+(sx+rb*0.05).toFixed(1)+','+sy.toFixed(1)+' '+(sx+rb*0.55).toFixed(1)+','+(sy+rb*0.8).toFixed(1)+
+         '" fill="none" stroke="'+C.red+'" stroke-width="1" stroke-dasharray="2 2" opacity=".75"/>';
+    // offset: perpendicular from the barrel path to the ball's centre
+    if(Math.abs(eff.off) > 0.02){
+      g += '<line x1="'+(cx+fx*K).toFixed(1)+'" y1="'+(cy-fy*K).toFixed(1)+'" x2="'+sx.toFixed(1)+'" y2="'+sy.toFixed(1)+
+           '" stroke="'+C.accent+'" stroke-width="1.6"/>';
+    }
+    g += '<circle cx="'+sx.toFixed(1)+'" cy="'+sy.toFixed(1)+'" r="2" fill="'+C.mineshaft+'"/>';
+    // contact point, where the two surfaces touch on the line of centres
+    const tx = R_BARREL*Math.cos(tn), ty = R_BARREL*Math.sin(tn);
+    g += '<circle cx="'+(cx+tx*K).toFixed(1)+'" cy="'+(cy-ty*K).toFixed(1)+'" r="3.2" fill="'+C.accent+'" stroke="'+C.mineshaft+'" stroke-width="1"/>';
+    // spin, as an arc over the top of the ball
+    // A miss has no batted ball: no spin, no launch.
+    const missed = Math.abs(eff.off) >= R_SUM;
+    if(!missed && Math.abs(rpm) > 150){
+      const r = rb + 6, a0 = -Math.PI*0.80, a1 = -Math.PI*0.20;   // svg angles, over the top
+      const p0 = [sx + r*Math.cos(a0), sy + r*Math.sin(a0)], p1 = [sx + r*Math.cos(a1), sy + r*Math.sin(a1)];
+      g += '<path d="M'+p0[0].toFixed(1)+','+p0[1].toFixed(1)+' A'+r+','+r+' 0 0 1 '+p1[0].toFixed(1)+','+p1[1].toFixed(1)+
+           '" fill="none" stroke="'+C.muted+'" stroke-width="1.2"/>';
+      // backspin: top of the ball runs back toward the catcher, so the head sits on the left end
+      const [hx, hy, ta] = rpm > 0 ? [p0[0], p0[1], a0 - Math.PI/2] : [p1[0], p1[1], a1 + Math.PI/2];
+      g += '<path d="M'+hx.toFixed(1)+','+hy.toFixed(1)+' l'+(-6*Math.cos(ta-0.5)).toFixed(1)+','+(-6*Math.sin(ta-0.5)).toFixed(1)+
+           ' M'+hx.toFixed(1)+','+hy.toFixed(1)+' l'+(-6*Math.cos(ta+0.5)).toFixed(1)+','+(-6*Math.sin(ta+0.5)).toFixed(1)+
+           '" stroke="'+C.muted+'" stroke-width="1.2" fill="none"/>';
+    }
+    // the batted ball leaving
+    if(!missed){
+      const lo = [sx + Math.cos(la)*(rb + 3), sy - Math.sin(la)*(rb + 3)];
+      g += arrow(lo[0], lo[1], lo[0] + Math.cos(la)*24, lo[1] - Math.sin(la)*24, C.accent2, 2);
+      g += '<text x="234" y="14" fill="'+C.accent2+'" text-anchor="end">LAUNCH '+fmt(col.la,1)+'&deg;</text>';
+    }
+    g += '<text x="6" y="14" fill="'+C.foot+'">&larr; CATCHER</text><text x="234" y="172" fill="'+C.foot+'" text-anchor="end">PITCHER &rarr;</text>';
+    $("ballview").innerHTML = g;
+
+    const glance = missed ? '<div class="row" style="color:var(--accent)">Offset exceeds barrel + ball radius: a miss</div>' : "";
+    // The offset is measured from the barrel's path, but the spin follows the slip,
+    // and the pitch's angle to that path adds slip of its own: a steep path into a
+    // flat pitch spins a ball met slightly over it backward, and the reverse.
+    const against = Math.abs(eff.off) >= 0.05 && (rpm > 0) !== (eff.off > 0);
+    const againstNote = against ? '<div class="row" style="color:var(--accent)">Spin runs against the offset: here the pitch&#39;s angle to the barrel path sets it</div>' : "";
+    $("ballnote").innerHTML = (missed ? "" :
+      '<div class="row"><span>Batted ball</span><b>' + kind + '</b></div>' +
+      '<div class="row"><span>Up and down</span><b>' + lift + '</b></div>' +
+      '<div class="row"><span>Side to side</span><b>' + curve.charAt(0).toUpperCase() + curve.slice(1) + '</b></div>') +
+      glance + (missed ? "" : againstNote) +
+      '<div style="margin-top:4px;color:var(--footnote)">Blue dot is where barrel meets ball. Offset is the model\'s, not measured: Savant publishes no per-swing offset.</div>';
+  }
+
+  /* Tilt and sidespin. A tilted barrel tips the spin axis, and on its own the
+     collision turns that into a lot of hook. Against 2025 (14,749 squared-up air
+     balls; spray on horizontal attack angle, launch angle and tilt, by attack
+     angle band) tilt moves direction +0.20, +0.10, -0.02 and -0.17 deg per deg
+     of tilt for attack angles -5..5, 5..12, 12..18 and 18..30. The collision as
+     is gave +0.16, +0.02, -0.13 and -0.57. Taking the sidespin from a league-median
+     32 deg tilt gives +0.18, +0.07, -0.04 and -0.36: closer in every
+     band. Tilt still sets the barrel, so the start direction and launch angle;
+     only the sidespin it adds on top is dropped. */
+  function tiltSide(col, eff, contact){
+    if(eff.tilt === DEF.tilt) return col;
+    const ref = collide(batPath({attackAngle:eff.aa, tilt:DEF.tilt, attackDir:eff.dir,
+                                 length:S.len, stand:HAND, contact}), eff).spin;
+    const d = col.dir, r = V.norm(V.cross(d, [0,0,1])), u = V.cross(r, d);
+    const side = w => w[0]*u[0] + w[1]*u[1] + w[2]*u[2];
+    col.spin = V.sub(col.spin, V.mul(u, side(col.spin) - side(ref)));
+    return col;
+  }
+
+  function draw(raw){
+    const eff = effective();
+    const contact = [eff.hand*S.side/12, 17/12 + S.depth/12, S.height];
+    const bp = batPath({attackAngle:eff.aa, tilt:eff.tilt, attackDir:eff.dir,
+                        length:S.len, stand:HAND, contact});
+    bp.hbaYaw = eff.hand*(S.dir - S.face)*Math.PI/180;   // the drawn bat faces where the collision aims
+    const col = tiltSide(collide(bp, eff), eff, contact);
+    // The drag fit runs a few dozen flights, so only when the batted ball changes.
+    const dragKey = [col.ev, col.la, col.bearing, ...col.spin].map(v => v.toFixed(4)).join("|");
+    if(dragKey !== lastDrag.key) lastDrag = {key: dragKey, cd0: fitDrag(col)};
+    const fl = flight(bp, col, lastDrag.cd0);
+    const cf = bp.contactFrac;
+    const frac = raw <= SWING_SHARE ? (raw/SWING_SHARE)*cf
+                                    : cf + ((raw-SWING_SHARE)/(1-SWING_SHARE))*(1-cf);
+    const hit = frac > cf;
+    let result = "In flight";
+    // Past barrel + ball radius the barrel never touches the ball. Fair or foul is
+    // judged where the ball first comes down, or where it reaches the wall: a ball
+    // that starts fair and hooks round the pole is foul, and the reverse is fair.
+    const miss = Math.abs(eff.off) >= R_SUM;
+    const foul = col.dir[1] < 0 || (!fl.cleared && !fl.wallHit && Math.abs(fl.landBear) > FOUL);
+
+    // pitch, walked backwards from the velocity your numbers imply
+    const va = S.pvaa*Math.PI/180, ha = S.phaa*Math.PI/180, pv = S.pv*PLATE_FRAC*1.46667;
+    const pvel = [pv*Math.cos(va)*Math.sin(ha), -pv*Math.cos(va)*Math.cos(ha), pv*Math.sin(va)];
+    // Shortened if needed so the drawn approach never comes up out of the dirt.
+    const zBack = t => contact[2] - pvel[2]*t - 16.087*t*t;
+    let T = Math.min(0.55, 55/Math.abs(pvel[1]));
+    while(T > 0.05 && zBack(T) < 0.3) T -= 0.005;
+    const N = 60, ppts = [];
+    for(let i=N;i>=0;i--){
+      const t = T*i/N;
+      ppts.push([contact[0]-pvel[0]*t, contact[1]-pvel[1]*t, contact[2]-pvel[2]*t - 16.087*t*t]);
+    }
+    const pp = {pts: ppts};
+
+    st.clear();
+    drawField3D(st, eff.hand);
+    drawGround(st, HAND);
+    // The foul lines from the back point of the plate out to where the chalk resumes.
+    const L = 8.4;
+    st.line([0,0,0.02], [-L*0.707, L*0.707, 0.02], "#F4F4F5", 1.3, .85);
+    st.line([0,0,0.02], [ L*0.707, L*0.707, 0.02], "#F4F4F5", 1.3, .85);
+    // Only while the camera is still on the swing: pulled back for the flight
+    // these four sit within a few feet of each other and collide.
+    const closeUp = !hit;   // gone once the ball is away, where they collide
+    if(closeUp){
+      st.label([-L*0.62, L*0.62, 0.05], eff.hand>0?"PULL":"OPPO", C.muted, 0, 9.5);
+      st.label([ L*0.62, L*0.62, 0.05], eff.hand>0?"OPPO":"PULL", C.muted, 0, 9.5);
+    }
+
+    drawPitch(st, pp, frac/cf, hit);
+    const k = pp.pts.length-1, near = pp.pts[Math.max(0,k-6)], at = pp.pts[k];
+    const dd = V.norm(V.sub(at, near));
+    st.line(V.sub(at, V.mul(dd,3.2)), V.add(at, V.mul(dd,1.2)), C.white, 1.1, .34);
+
+    drawBat(st, bp, Math.max(0.02, frac));
+    /* At contact, level with the ball: where the barrel is moving (horizontal
+       attack angle) and where it faces (horizontal bat angle, the same turn the
+       collision uses). The gap between them is the face-to-path angle. */
+    const flat = V.norm([bp.tangent[0], bp.tangent[1], 0]);
+    const faceDir = V.norm(rot(flat, [0,0,1], bp.hbaYaw));
+    const arrow = (dir, len, color, text, dy) => {
+      const tip = V.add(contact, V.mul(dir, len));
+      // Each stroke over a dark one of the same depth (the sort keeps their order),
+      // so the green face arrow still reads against green grass.
+      const seg = (a, b) => { st.line(a, b, "#000000", 5, .5); st.line(a, b, color, 2.6, .95); };
+      seg(contact, tip);
+      for(const a of [2.6, -2.6]) seg(tip, V.add(tip, V.mul(rot(dir, [0,0,1], a), 0.45)));
+      if(closeUp) st.label(tip, text, color, dy, 9.5);
+    };
+    // Labels one above, one below the tips: the arrows sit only a few degrees apart.
+    const AL = st.w < 600 ? 1.2 : 2;              // shorter on a phone, where the canvas is narrow
+    arrow(flat, AL, C.white, "PATH", 11);
+    arrow(faceDir, AL, C.green, "FACE", -11);
+    const bd = [Math.sin(col.bearing), Math.cos(col.bearing), 0];
+    const bTip = V.add(contact, V.mul(bd, 7.4));
+    st.line([contact[0],contact[1],0.03], [bTip[0],bTip[1],0.03], C.accent2, 1.5, .75);
+    if(closeUp) st.label([bTip[0], bTip[1], 0.05], "BALL", C.accent2, -6, 9);
+
+    /* Once the ball is struck the camera eases back so the whole flight fits,
+       then holds on the landing spot. Orbit and zoom still belong to the viewer:
+       only the distance and what the camera is looking at are driven here. */
+    // A zoom the viewer makes sticks; the pull-back this code applies does not.
+    if(homeDist === null) homeDist = st.dist;
+    if(homePitch === null) homePitch = st.pitch;
+    if(lastSet !== null && Math.abs(st.dist - lastSet) > 0.001) homeDist = st.dist;
+    if(lastPitch !== null && Math.abs(st.pitch - lastPitch) > 0.001) homePitch = st.pitch;
+    if(!hit){
+      st.dist = homeDist; lastSet = homeDist;
+      st.pitch = homePitch; lastPitch = homePitch;
+      st.target = [contact[0]*0.4, contact[1]*0.9, contact[2]*0.95];
+    }
+    if(hit){
+      // The flight and its landing mark draw over the stands: a home run comes
+      // down among the seats, and the nearer rows would otherwise hide it.
+      const TOP = 20;
+      const q = (frac-cf)/(1-cf), n = fl.pts.length-1;
+      const upto = Math.max(1, Math.round(n*q));
+      for(let i=0;i<upto;i++){
+        const k = i/n;
+        // On the ground it is a roll, not a flight: thinner, flatter, no taper.
+        const air = fl.pts[i][2] > 0.12 || fl.pts[i+1][2] > 0.12;
+        st.line(fl.pts[i], fl.pts[i+1], C.white,
+                air ? 1.4 + 1.4*k : 1.1, air ? .45 + .5*k : .42, TOP);
+        /* The same flight painted flat on the grass: without it, height and
+           distance look identical from most camera angles. Only while the ball
+           is genuinely up -- down near the dirt this lay on top of the trail and
+           the pair read as one smeared line, which was the other half of why
+           ground balls looked wrong. */
+        if(fl.pts[i][2] > 1.6 || fl.pts[i+1][2] > 1.6)
+          st.line([fl.pts[i][0], fl.pts[i][1], 0.06], [fl.pts[i+1][0], fl.pts[i+1][1], 0.06],
+                  C.footnote, 1.1, .5);
+      }
+      const ball = fl.pts[upto];
+      if(ball[2] > 1.2){
+        st.dot([ball[0], ball[1], 0.07], C.footnote, 3);       // shadow
+        st.line([ball[0], ball[1], 0.07], ball, C.footnote, 1, .35);
+      }
+      st.dot(ball, C.white, 5.5, TOP);
+
+      /* The mark goes where the ball first came down, never where it finished
+         rolling, and it is sized to the ball that made it. */
+      const li = fl.landIdx, land = fl.pts[li], reach = fl.carry;
+      const apex = fl.pts.slice(0, li+1).reduce((m, p3) => Math.max(m, p3[2]), 0);
+      const low = apex < 14;
+      const isHR = !foul && fl.cleared;
+      result = isHR ? "Home run" : fl.overOnHop && !foul ? "Ground-rule double" : fl.wallHit ? "Off the wall" : "In play";
+      if(q > 0.9){
+        const mark = isHR ? C.accent : C.white;
+        const rr = low ? 4 : 7, post = low ? 3.2 : 16;
+        for(let i=0;i<24;i++){
+          const a0 = i/24*2*Math.PI, a1 = (i+1)/24*2*Math.PI;
+          st.line([land[0]+Math.cos(a0)*rr, land[1]+Math.sin(a0)*rr, 0.08],
+                  [land[0]+Math.cos(a1)*rr, land[1]+Math.sin(a1)*rr, 0.08], mark, 1.6, .9, TOP);
+        }
+        st.line([land[0], land[1], 0.08], [land[0], land[1], post], mark, 1.4, .55, TOP);
+        st.label([land[0], land[1], post + (low ? 2.6 : 6)],
+                 Math.round(reach) + " FT", mark, 0, low ? 9.5 : 11, TOP);
+        // A fixed step above the distance in screen pixels, so the two never touch when the camera is far back.
+        if(isHR) st.label([land[0], land[1], post + 6], "HOME RUN", C.accent, -15, 12, TOP);
+      }
+      const ease = q*q*(3-2*q);                                  // smoothstep
+      const aim = e => [contact[0] + (land[0]-contact[0])*0.55*e,
+                        contact[1] + (land[1]-contact[1])*0.55*e,
+                        contact[2] + (apex*0.45 - contact[2])*e];
+      /* Where the move ends, the landing spot and its label must sit in the open
+         field, not under a panel: back away until they do. */
+      let wide = Math.max(homeDist, 0.78*reach + 34);
+      const fr = st.frame || {x: st.w/2, y: st.h/2, w: st.w, h: st.h};
+      st.pitch = 0.42; st.target = aim(1);
+      for(let k = 0; k < 30; k++){
+        st.dist = wide;
+        const b = st.basis();
+        const fits = [land, [land[0], land[1], isHR ? 36 : 24]].every(p => {
+          const s = st.project(p, b);
+          return s && Math.abs(s.x - fr.x) < fr.w/2 - 60 && Math.abs(s.y - fr.y) < fr.h/2 - 24; });
+        if(fits) break;
+        wide *= 1.04;
+      }
+      st.dist = homeDist + (wide - homeDist)*ease;
+      lastSet = st.dist;
+      // lift the eye as it backs away, or the park reads as a sliver on the horizon
+      st.pitch = homePitch + (0.42 - homePitch)*ease;
+      lastPitch = st.pitch;
+      st.target = aim(ease);
+    }
+    if(foul) result = "Foul";
+    if(miss) result = "Miss";
+    st.dot(contact, C.white, 3.6);
+    st.render();
+
+    // Face against path, and the golf-style combinations Driveline mocap rarely shows.
+    const facePath = S.face - S.dir;
+    const bearingDeg = col.bearing*180/Math.PI*eff.hand;
+    const combo = miss ? "" : facePath < -23 || facePath > 14 ? "beyond 99% of real swings"
+      : bearingDeg < -10 && facePath > 3 ? "rare pull-fade" : bearingDeg > 10 && facePath < -3 ? "rare push-hook"
+      : bearingDeg > 10 && Math.abs(facePath) < 3 ? "rare flush oppo" : "";
+    const hm = v => miss ? fmt(null) : v;          // a miss has no batted ball
+    const tiles = [
+      ['Exit velo<span class="lx">, sweet spot</span>', hm(fmt(col.ev,1)), miss ? "" : "mph", true,
+       "Exit velocity for this swing and offset, met on the barrel's sweet spot: no miss along the barrel is charged, so read it as a ceiling"],
+      ['Launch<span class="lx"> angle</span>', hm(fmt(col.la,1) + "\u00b0"), ""],
+      ["Carry", hm(fmt(fl.carry,0)), miss ? "" : "ft"],
+      // a step smaller when long, so "Ground-rule double" keeps to two lines on a phone
+      ["Result", result.length > 12 ? '<span style="font-size:.74em">' + result.replace("-", "&#8209;") + '</span>' : result, ""],
+      ["Hang time", hm(fmt(fl.hang,2)), miss ? "" : "s"],
+      ["Ball starts", miss ? fmt(null) : Math.abs(bearingDeg) < 1.5 ? "Straight" : fmt(Math.abs(bearingDeg),0) + "\u00b0", miss || Math.abs(bearingDeg) < 1.5 ? "" : bearingDeg < 0 ? "pull" : "oppo"],
+      ["Face vs path", Math.abs(facePath) < 3 ? "Square" : fmt(Math.abs(facePath),0) + "\u00b0", Math.abs(facePath) < 3 ? combo : (facePath < 0 ? "closed" : "open") + (combo ? ", " + combo : ""), false,
+       "Horizontal bat angle minus horizontal attack angle. Closed: the barrel faces more pull than it moves; open: more oppo. In 16,248 Driveline mocap swings the face sat a median 3 deg closed, 90 percent between 14 closed and 8 open, 98 percent between 23 closed and 14 open. Rare there: pull-fade (pulled, face open) 3 percent of swings, push-hook (oppo, face closed) 2, flush oppo 4"],
+    ];
+    stats($("ro-lab"), tiles);
+    stats($("ro-more"), tiles.slice(4));   // on a phone the bar above keeps only the first four
+    drawBallView(eff, col, bp);
+
+    $("pcts").innerHTML = [["bs","bat_speed","Bat speed",S.bs],
+                           ["aa","attack_angle","Attack angle",eff.aa],
+                           ["tilt","swing_path_tilt","Swing tilt",eff.tilt],
+                           ["dir","attack_direction","Horizontal attack angle",eff.dir]]
+      .map(([k,dk,label,val]) => {
+        const p = pctOf(dk, val);
+        if(p == null) return "";
+        return '<div class="pct"><span class="pl">' + label + '</span>' +
+               '<span class="pbar"><i style="width:' + p + '%"></i></span>' +
+               '<span class="pv">' + p + '<em>th</em></span></div>';
+      }).join("");
+  }
+
+  function paint(k){
+    const el = $("v-"+k);
+    if(el) el.textContent = S[k].toFixed(DEC[k]) + UNIT[k];
+  }
+  SLIDERS.forEach(([k]) => {
+    const s = $("s-"+k);
+    s.addEventListener("input", e => {
+      const v = parseFloat(e.target.value);
+      // Real swings turn the face 1.21 deg per deg of path (Driveline mocap, r2 0.72).
+      if(k === "dir" && $("s-link").checked){
+        S.face = Math.max(-40, Math.min(30, S.face + 1.21*(v - S.dir)));
+        $("s-face").value = S.face; paint("face");
+      }
+      S[k] = v; paint(k); if(tr) tr.render();
+    });
+    paint(k);
+  });
+  $("details-btn").addEventListener("click", () => {
+    const open = $("lab").classList.toggle("details");
+    $("details-btn").setAttribute("aria-expanded", open);
+    $("details-btn").textContent = open ? "Hide details" : "Details: contact, MLB percentiles, more results";
+  });
+  // Phone: one button steps through the camera presets instead of a row of five.
+  $("cam-cycle").addEventListener("click", () => {
+    const bs = [...$("cam-lab").querySelectorAll(".btn")];
+    const next = bs[(bs.findIndex(b => b.classList.contains("on")) + 1) % bs.length];
+    next.click();
+    $("cam-cycle").textContent = "View: " + next.textContent;
+  });
+  $("more-btn").addEventListener("click", () => {
+    const open = document.querySelector(".panel.left").classList.toggle("more");
+    $("more-btn").setAttribute("aria-expanded", open);
+    $("more-btn").textContent = open ? "Fewer settings" : "More settings: batter, tilt, pitch, face link";
+  });
+  // Each preset is a full swing from the league-average default, so they never stack.
+  $("presets").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    Object.assign(S, DEF, JSON.parse(b.getAttribute("data-p")));
+    SLIDERS.forEach(([k]) => { $("s-"+k).value = S[k]; paint(k); });
+    tr.render();
+  }));
+  $("reset").addEventListener("click", () => {
+    Object.assign(S, DEF);
+    SLIDERS.forEach(([k]) => { $("s-"+k).value = S[k]; paint(k); });
+    tr.render();
+  });
+  onHand(() => tr && tr.render());
+  /* Half speed by default: at full speed the swing is over before a change to
+     a slider has registered, which is the whole point of the page. */
+  tr = Transport($("play-lab"), $("t-lab"), draw,
+                 {step:0.0045, hold:1.4, start:0.30, autoplay:true, speed:0.5});
+  {
+    const sp = $("spd-lab");
+    sp.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => {
+        sp.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+        tr.setSpeed(parseFloat(b.getAttribute("data-mult")));
+      });
+    });
+  }
+}
+
+</script>
+
+</body></html>
